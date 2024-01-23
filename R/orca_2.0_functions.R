@@ -178,7 +178,7 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
   screener$timestamp = strptime(screener$timestamp, format = "%Y-%m-%d %H:%M:%S") 
   min_date_time = strptime(min_date_time, format = "%Y-%m-%d %H:%M:%S") 
   screener = filter(screener, timestamp > min_date_time)
-  screener = new_clean_race(screener)
+  screener = clean_race(screener)
   screener$zipcode <- as.integer(screener$zipcode)
   zip_info <- zips()
   cities <- city_info()
