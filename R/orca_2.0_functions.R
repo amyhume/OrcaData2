@@ -256,6 +256,27 @@ flag_numeric_names <- function(data) {
   return(data)
 }
 
+#' @title INELIGIBLE AGES
+#' @description Flags any child ages older than 380 days from today
+#' @param data The data frame you wish to act on
+#' @param threshold_date The date threshold you wish to compare - default is 380 days prior to today
+#' @return A dataframe with a new column marking 1 for anybody too old to participate
+#' @export
+flag_ineligible_age <- function(data, threshold_date = Sys.Date() - 380) {
+  library(dplyr)
+  for (p in 1:nrow(data)) {
+    if (!is.na(data$child_dob[p])) {
+      current_age <- as.numeric(difftime(Sys.Date(), data$child_dob[p], units = 'days'))
+      data[p, "age_ineligible"] <- ifelse(current_age > 152, 1, 0)
+    } else if (!is.na(data$due_date[p])){
+      data[p, "age_ineligible"] <- 0
+    } else {
+      data[p, "age_ineligible"] <- NA
+    }
+  }
+  return(data)
+}
+
 
 #' @title Screens screener export
 #' @description Checks for: duplicate contact info, under 18, numeric names, NA names/emails, babies above age threshold, names all lowercase
