@@ -342,7 +342,7 @@ import_data <- function(token, data = data) {
   all <- filter(all, redcap_event_name == unique_events)
   all <- all[, colnames(all) %in% colnames(data)]
   test <- all %>%
-    full_join(data, by=c('record_id', 'redcap_event_name'))
+    right_join(data, by=c('record_id', 'redcap_event_name'))
   
   #ask user to check data import against existing data
   print(test); cat("Check the dataset above carefully. columns x represent the existing data contents, column y represents the data that will overwrite\n",
