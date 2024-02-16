@@ -195,8 +195,24 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
     rural == 'N' & non_white == 'N' & low_ses == 'N' ~ 'Low Priority',
     rural == 'Y' | non_white == 'Y' | low_ses == 'Y' ~ 'High Priority'
   ))
+  
+  screener$current_age <- as.numeric(difftime(Sys.Date(), screener$child_dob, units = 'days'))
+  
+  for (i in 1:nrow(screener)){
+    if (screener$child_yesno[i] == 1 & screener$pregnant_yesno[i] == 1) {
+      if (screener$current_age[i] <= 135) {
+        new_row <- screener[i, ]
+        new_row$child_yesno <- NA
+        new_row$child_dob <- NA
+        screener$pregnant_yesno[i] <- NA
+        screener$due_date[i] <- NA
+        screener <- rbind(screener, new_row)
+      }
+    }
+  }
+  
   screener <- mutate(screener, expected_invite_date = case_when(
-    child_yesno == 1 ~ child_dob + 90,
+    child_yesno == 1 & current_age <= 135 ~ child_dob + 90,
     pregnant_yesno == 1 ~ due_date + 90
   ))
   screener <- unite(screener, caregiver_name, caregiver_firstname, caregiver_lastname, sep = " ", na.rm = TRUE)
@@ -214,6 +230,7 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
   return (screener)
 }
 
+
 #' @title Duplicate contacts
 #' @description Flags any participant with a duplicate phone or email
 #' @param data The data frame you wish to act on
@@ -222,12 +239,8 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
 flag_duplicate_contacts <- function(data) {
   library(dplyr)
   data <- data %>%
-    group_by(email) %>%
-    mutate(duplicate_email = ifelse(!is.na(email) & n() > 1, 1, 0)) %>%
-    ungroup() %>%
-    group_by(phone) %>%
-    mutate(duplicate_phone = ifelse(!is.na(phone) & n() > 1, 1, 0)) %>%
-    ungroup()
+    mutate(duplicate_email = ifelse(duplicated(email) & !duplicated(screener_record_id), 1, 0),
+           duplicate_phone = ifelse(duplicated(phone) & !duplicated(screener_record_id), 1, 0))
   return(data)
 }
 
