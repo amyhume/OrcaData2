@@ -215,8 +215,8 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
   }
   
   screener <- mutate(screener, expected_invite_date = case_when(
-    child_yesno == 1 & current_age <= 135 ~ child_dob + 90,
-    pregnant_yesno == 1 ~ due_date + 90
+    child_yesno == 1 & current_age <= 135 ~ child_dob + 107,
+    pregnant_yesno == 1 ~ due_date + 107
   ))
   screener <- unite(screener, caregiver_name, caregiver_firstname, caregiver_lastname, sep = " ", na.rm = TRUE)
   screener$texting_okay <- gsub(1, "Yes", screener$texting_okay)
@@ -283,7 +283,7 @@ flag_ineligible_age <- function(data, threshold_date = Sys.Date() - 380) {
   for (p in 1:nrow(data)) {
     if (!is.na(data$child_dob[p]) & data$pregnant_yesno[p] == 0) {
       current_age <- as.numeric(difftime(Sys.Date(), data$child_dob[p], units = 'days'))
-      data[p, "age_ineligible"] <- ifelse(current_age > 152, 1, 0)
+      data[p, "age_ineligible"] <- ifelse(current_age > threshold_date, 1, 0)
     } else if (!is.na(data$due_date[p])){
       data[p, "age_ineligible"] <- 0
     } else {
@@ -302,7 +302,7 @@ flag_ineligible_age <- function(data, threshold_date = Sys.Date() - 380) {
 screen_fraudulence <- function(data) {
   library(dplyr)
   data <- data %>%
-    flag_ineligible_age(threshold_date = Sys.Date() - 152) %>%
+    flag_ineligible_age(threshold_date = Sys.Date() - 135) %>%
     flag_duplicate_contacts() %>%
     flag_lowercase_names() %>%
     flag_numeric_names()
