@@ -283,7 +283,7 @@ flag_ineligible_age <- function(data, threshold_date = Sys.Date() - 380) {
   for (p in 1:nrow(data)) {
     if (!is.na(data$child_dob[p]) & data$pregnant_yesno[p] == 0) {
       current_age <- as.numeric(difftime(Sys.Date(), data$child_dob[p], units = 'days'))
-      data[p, "age_ineligible"] <- ifelse(current_age > threshold_date, 1, 0)
+      data[p, "age_ineligible"] <- ifelse(current_age > 135, 1, 0)
     } else if (!is.na(data$due_date[p])){
       data[p, "age_ineligible"] <- 0
     } else {
@@ -292,7 +292,6 @@ flag_ineligible_age <- function(data, threshold_date = Sys.Date() - 380) {
   }
   return(data)
 }
-
 
 #' @title Screens screener export
 #' @description Checks for: duplicate contact info, under 18, numeric names, NA names/emails, babies above age threshold, names all lowercase
