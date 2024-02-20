@@ -198,9 +198,12 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
   
   screener$current_age <- as.numeric(difftime(Sys.Date(), screener$child_dob, units = 'days'))
   
+  screener$child_yesno <- ifelse(is.na(screener$child_yesno), 0, screener$child_yesno)
+  screener$pregnant_yesno <- ifelse(is.na(screener$pregnant_yesno), 0, screener$pregnant_yesno)
+  
   for (i in 1:nrow(screener)){
     if (screener$child_yesno[i] == 1 & screener$pregnant_yesno[i] == 1) {
-      if (screener$current_age[i] <= 135) {
+      if (!is.na(screener$current_age[i]) & screener$current_age[i] <= 135) {
         new_row <- screener[i, ]
         new_row$child_yesno <- NA
         new_row$child_dob <- NA
