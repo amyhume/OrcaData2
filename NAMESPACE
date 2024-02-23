@@ -2,6 +2,7 @@
 
 export(city_info)
 export(clean_race)
+export(flag_due_dates)
 export(flag_duplicate_contacts)
 export(flag_ineligible_age)
 export(flag_lowercase_names)

@@ -293,6 +293,17 @@ flag_ineligible_age <- function(data, threshold_date = Sys.Date() - 380) {
   return(data)
 }
 
+#' @title SUSPICIOUS DUE DATES
+#' @description Flags any response where the due date is over 40 weeks away or earlier than the day the screener was filled out
+#' @param data The data frame you wish to act on
+#' @return A dataframe with a new column marking 1 for anybody with an impossible due date
+#' @export
+flag_due_dates <- function(data) {
+  data <- data %>%
+    mutate(incorrect_due_date = ifelse(!is.na(due_date) & (difftime(due_date, Sys.Date(), units='days') > 280 | due_date < timestamp()), 1, 0))
+  return(data)
+}
+
 #' @title Screens screener export
 #' @description Checks for: duplicate contact info, under 18, numeric names, NA names/emails, babies above age threshold, names all lowercase
 #' @param data The data frame you wish to act on
@@ -304,21 +315,25 @@ screen_fraudulence <- function(data) {
     flag_ineligible_age(threshold_date = Sys.Date() - 135) %>%
     flag_duplicate_contacts() %>%
     flag_lowercase_names() %>%
-    flag_numeric_names()
+    flag_numeric_names() %>%
+    flag_due_dates()
+  
   #creating new datasets
   ineligible_ages <- data %>%
     filter(age_ineligible == 1)
   duplicate_contacts <- data %>%
     filter(duplicate_email == 1 | duplicate_phone == 1)
+  impossible_due_dates <- data %>%
+    filter(incorrect_due_date == 1)
   #removing NA names, numeric names, under 18 caregivers, duplicate contact info and age_ineligible babies
   data <- data %>%
-    filter(!is.na(caregiver_name) & !is.na(email) & over_18 == "Yes" & num_name_flag == 0 & age_ineligible == 0)
+    filter(!is.na(caregiver_name) & !is.na(email) & over_18 == "Yes" & num_name_flag == 0 & age_ineligible == 0 & incorrect_due_date == 0)
   data <- data %>%
     filter(duplicate_email == 0 & duplicate_phone == 0)
   #removing excess columns other than flagged lowercase names 
   data <- data %>%
-    select(-age_ineligible, -duplicate_email, -duplicate_phone, -num_name_flag)
-  return(list(data = data, ineligible_ages = ineligible_ages, duplicate_contacts = duplicate_contacts))
+    select(-age_ineligible, -duplicate_email, -duplicate_phone, -num_name_flag, -incorrect_due_date)
+  return(list(data = data, ineligible_ages = ineligible_ages, duplicate_contacts = duplicate_contacts, impossible_due_dates = impossible_due_dates))
 }
 
 #' @title Pulls US zipcode database
