@@ -300,7 +300,7 @@ flag_ineligible_age <- function(data, threshold_date = Sys.Date() - 380) {
 #' @export
 flag_due_dates <- function(data) {
   data <- data %>%
-    mutate(incorrect_due_date = ifelse(!is.na(due_date) & (difftime(due_date, Sys.Date(), units='days') > 280 | due_date < timestamp()), 1, 0))
+    mutate(incorrect_due_date = ifelse(!is.na(due_date) & (difftime(due_date, Sys.Date(), units='days') > 280 | due_date < timestamp), 1, 0))
   return(data)
 }
 
