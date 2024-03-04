@@ -227,7 +227,7 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
   screener$language <- gsub(2, "Spanish", screener$language)
   screener$language <- gsub(3, "Other (check redcap)", screener$language)
   screener <- filter(screener, bot_check == 3)
-  col_order <- c("screener_record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rural", "non_white", "low_ses", "priority", "expected_invite_date")
+  col_order <- c("screener_record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rec_source", "rural", "non_white", "low_ses", "priority", "expected_invite_date", "bot_check", "bot_pic_answer")
   screener <- screener[, col_order]
   screener <- dplyr::arrange(screener, timestamp)
   return (screener)
@@ -325,15 +325,17 @@ screen_fraudulence <- function(data) {
     filter(duplicate_email == 1 | duplicate_phone == 1)
   impossible_due_dates <- data %>%
     filter(incorrect_due_date == 1)
+  failed_attention_checks <- data %>%
+    filter(bot_check != 3 | bot_pic_answer != 4)
   #removing NA names, numeric names, under 18 caregivers, duplicate contact info and age_ineligible babies
   data <- data %>%
-    filter(!is.na(caregiver_name) & !is.na(email) & over_18 == "Yes" & num_name_flag == 0 & age_ineligible == 0 & incorrect_due_date == 0)
-  data <- data %>%
+    filter(!is.na(caregiver_name) & over_18 == "Yes" & num_name_flag == 0 & age_ineligible == 0 & incorrect_due_date == 0) %>%
+    filter(bot_check == 3 & bot_pic_answer == 4) %>%
     filter(duplicate_email == 0 & duplicate_phone == 0)
   #removing excess columns other than flagged lowercase names 
   data <- data %>%
-    select(-age_ineligible, -duplicate_email, -duplicate_phone, -num_name_flag, -incorrect_due_date)
-  return(list(data = data, ineligible_ages = ineligible_ages, duplicate_contacts = duplicate_contacts, impossible_due_dates = impossible_due_dates))
+    select(-age_ineligible, -duplicate_email, -duplicate_phone, -num_name_flag, -incorrect_due_date, -bot_check, -bot_pic_answer)
+  return(list(data = data, ineligible_ages = ineligible_ages, duplicate_contacts = duplicate_contacts, impossible_due_dates = impossible_due_dates, failed_attention_checks = failed_attention_checks))
 }
 
 #' @title Pulls US zipcode database
