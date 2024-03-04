@@ -386,6 +386,7 @@ import_data <- function(token, data = data) {
   all <- all[, colnames(all) %in% colnames(data)]
   test <- all %>%
     right_join(data, by=c('record_id', 'redcap_event_name'))
+
   
   #ask user to check data import against existing data
   print(test); cat("Check the dataset above carefully. columns x represent the existing data contents, column y represents the data that will overwrite\n",
@@ -427,4 +428,43 @@ get_all_data <- function(token) {
   response <- httr::POST(url, body = formData, encode = "form")
   result <- httr::content(response)
   return(result)
+}
+
+
+#' @title Input Reasons for Screener Ignores
+#' @description asks for input for each import that has a 0 marked for contact (1-4 codes) and a description for any 'other' reasons
+#' @param data the data frame to act on
+#' @return A data frame with the reason columns added, only if there were 0s present in the first place
+#' @export
+input_reason_for_ignores <- function(data) {
+  #adding reasons for not contacting
+  if (0 %in% data$orca_contact_yesno) {
+    for (x in 1:nrow(data)) {
+      if (data$orca_contact_yesno[x] == 0) {
+        cat(paste0("For record ", data$record_id[x], " why are we ignoring? Please enter a numeric code out of:\n",
+                   "1: Potentially Fraudulent\n",
+                   "2: Wrong child age\n",
+                   "3: Caregiver under 18\n",
+                   "4: Other"))
+        
+        response <- readline(prompt = "Enter your code here: ")
+        data[x, "contact_no_why"] <- response
+      } else {
+        data[x, "contact_no_why"] <- NA
+      }
+    } 
+    #adding other descriptions 
+    if (4 %in% data$contact_no_why) {
+      for (x in 1:nrow(data)) {
+        if (data[x, "contact_no_why"] == 4 & !is.na(data[x, "contact_no_why"])) {
+          response <- readline(prompt = paste0("For record ", data[x, "record_id"], " please describe why we are ignoring:"))
+          
+          data[x, "contact_no_other"] <- response
+        } else {
+          data[x, "contact_no_other"] <- NA
+        }
+      }
+    }
+  }
+  return(data)
 }
