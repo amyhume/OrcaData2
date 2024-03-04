@@ -226,6 +226,15 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
   screener$language <- gsub(1, "English", screener$language)
   screener$language <- gsub(2, "Spanish", screener$language)
   screener$language <- gsub(3, "Other (check redcap)", screener$language)
+  
+  screener <- screener %>%
+    mutate(rec_source = case_when(
+      rec_source == 1 ~ 'Social media',
+      rec_source == 2 ~ 'Through a friend',
+      rec_source == 3 ~ 'Organization',
+      rec_source == 4 ~ 'Other'
+    ))
+  
   screener <- filter(screener, bot_check == 3)
   col_order <- c("screener_record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rec_source", "rural", "non_white", "low_ses", "priority", "expected_invite_date", "bot_check", "bot_pic_answer")
   screener <- screener[, col_order]
