@@ -330,8 +330,9 @@ screen_fraudulence <- function(data) {
   #removing NA names, numeric names, under 18 caregivers, duplicate contact info and age_ineligible babies
   data <- data %>%
     filter(!is.na(caregiver_name) & over_18 == "Yes" & num_name_flag == 0 & age_ineligible == 0 & incorrect_due_date == 0) %>%
-    filter(bot_check == 3 & bot_pic_answer == 4) %>%
-    filter(duplicate_email == 0 & duplicate_phone == 0)
+    filter(bot_check == 3) %>%
+    filter(duplicate_email == 0 & duplicate_phone == 0) %>%
+    filter(!is.na(phone) & !is.na(email))
   #removing excess columns other than flagged lowercase names 
   data <- data %>%
     select(-age_ineligible, -duplicate_email, -duplicate_phone, -num_name_flag, -incorrect_due_date, -bot_check, -bot_pic_answer)
