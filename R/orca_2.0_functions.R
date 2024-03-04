@@ -232,7 +232,8 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
       rec_source == 1 ~ 'Social media',
       rec_source == 2 ~ 'Through a friend',
       rec_source == 3 ~ 'Organization',
-      rec_source == 4 ~ 'Other'
+      rec_source == 4 ~ 'Other',
+      is.na(rec_source) ~ NA
     ))
   
   screener <- filter(screener, bot_check == 3)
