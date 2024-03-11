@@ -468,3 +468,67 @@ input_reason_for_ignores <- function(data) {
   }
   return(data)
 }
+
+#' @title Standardizes birthweight responses
+#' @description takes character birthweight responses, cleans them and splits them into lb and oz columns
+#' @param data the data frame to act on
+#' @return A data frame with the split birth weight columns (lb, oz)
+#' @export
+clean_birthweight <- function(data) {
+  data$child_birth_weight <- tolower(data$child_birth_weight)
+  
+  for (row in 1:nrow(data)) {
+    
+    if (str_detect(data$child_birth_weight[row], "lbs")) {
+      data$child_birth_weight[row] <- gsub("lbs", ",", data$child_birth_weight[row])
+    } else if (str_detect(data$child_birth_weight[row], " ") & !str_detect(data$child_birth_weight[row], ",")) {
+      data$child_birth_weight[row] <- gsub(" ", ",", data$child_birth_weight[row])
+      
+    }
+  }
+  
+  
+  data <- data %>%
+    separate(child_birth_weight, into = c("child_birth_lb", "child_birth_oz"), sep = ",", remove = F)
+  
+  data <- data %>%
+    mutate(child_birth_lb = parse_number(child_birth_lb),
+           child_birth_oz = parse_number(child_birth_oz))
+  
+  na_values <- sum(is.na(data$child_birth_lb))
+  
+  if (sum(is.na(data$child_birth_lb)) == sum(is.na(data$child_birth_weight))) {
+    data <- dplyr::select(data, -child_birth_weight)
+    return(data)
+  } else {
+    print("there may be an error with child_birth_weight column - check formatting and try again")
+  }
+}
+
+#' @title Calculates ITN
+#' @description calculates ITN based on poverty threshold for number of people in household and annual income
+#' @param data the data frame to act on
+#' @return A data frame with ITN
+#' @export
+calculate_itn <- function(data) {
+  #creating poverty guideline data base (2024)
+  poverty_guidelines <- data.frame(
+    household_n = c(1,2,3,4,5,6,7,8),
+    income_threshold = c(15060,20440,25820,31200,36580,41960,47340,52720)
+  )
+  
+  for (row in 1:nrow(data)) {
+    total_household = (data$children_home[row] + data$adults_home[row])
+    
+    if (total_household <= 8) {
+      index <- which(poverty_guidelines$household_n == total_household)
+    } else {
+      index = 8
+    }
+    
+    threshold = poverty_guidelines$income_threshold[index]
+    data$itn[row] <- data$annual_income[row] / threshold
+  }
+  
+  return(data)
+}
