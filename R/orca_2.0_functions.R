@@ -291,7 +291,7 @@ flag_numeric_names <- function(data) {
 flag_ineligible_age <- function(data, threshold_date = Sys.Date() - 380) {
   library(dplyr)
   for (p in 1:nrow(data)) {
-    if (!is.na(data$child_dob[p]) & data$pregnant_yesno[p] == 0) {
+    if (!is.na(data$child_dob[p]) & (data$pregnant_yesno[p] == 0 | is.na(data$pregnant_yesno[p]))) {
       current_age <- as.numeric(difftime(Sys.Date(), data$child_dob[p], units = 'days'))
       data[p, "age_ineligible"] <- ifelse(current_age > 135, 1, 0)
     } else if (!is.na(data$due_date[p])){
@@ -336,7 +336,7 @@ screen_fraudulence <- function(data) {
   impossible_due_dates <- data %>%
     filter(incorrect_due_date == 1)
   failed_attention_checks <- data %>%
-    filter(bot_check != 3 | bot_pic_answer != 4)
+    filter(bot_check != 3 & bot_pic_answer != 4)
   #removing NA names, numeric names, under 18 caregivers, duplicate contact info and age_ineligible babies
   data <- data %>%
     filter(!is.na(caregiver_name) & over_18 == "Yes" & num_name_flag == 0 & age_ineligible == 0 & incorrect_due_date == 0) %>%
