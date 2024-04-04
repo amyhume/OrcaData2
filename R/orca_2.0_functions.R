@@ -532,3 +532,29 @@ calculate_itn <- function(data) {
   
   return(data)
 }
+
+#' @title Pulling Eligible Screener Responses
+#' @description Pulls screener responses who have been enrolled in the study
+#' @param token Unique REDCap API token
+#' @param min_date_time The minimum timestamp to pull responses after
+#' @return A data frame with screener record id and group participant was enrolled within (prenatal/postnatal)
+#' @export
+get_eligible_responses <- function(token, min_date_time = "2022-01-01 00:00:00") {
+  screener <- get_orca_screener(token, min_date_time = min_date_time)
+  screener <- dplyr::rename(screener, record_id = screener_record_id)
+  eligible <- get_orca_field(token, field='orca_contact_yesno')
+  
+  eligible <- dplyr::filter(eligible, orca_contact_yesno == 1)
+  
+  screener <- dplyr::right_join(screener, eligible, by="record_id")
+  
+  screener$days_to_birth = as.numeric(difftime(screener$due_date, Sys.Date(), units="days"))
+  screener$age_at_screener = as.numeric(difftime(screener$timestamp, screener$child_dob, units="days"))
+  
+  screener <- dplyr::mutate(screener, group = ifelse(!is.na(child_dob) & is.na(due_date) & age_at_screener <= 137, 'postnatal',
+                                                     ifelse(!is.na(due_date) & is.na(child_dob), 'prenatal',
+                                                            ifelse(!is.na(due_date) & !is.na(child_dob) & child_dob > 137, 'prenatal', 'hm'))))
+  screener <- dplyr::select(screener, record_id, group)
+  
+  return(screener)
+}
