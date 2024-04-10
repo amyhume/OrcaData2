@@ -384,15 +384,41 @@ import_data <- function(token, data = data) {
   all <- get_all_data(token)
   all <- filter(all, redcap_event_name == unique_events)
   all <- all[, colnames(all) %in% colnames(data)]
+  
+  columns <- colnames(all)[!str_detect(colnames(all), 'record_id') & !str_detect(colnames(all), 'redcap_event_name')]
+  
   test <- all %>%
     right_join(data, by=c('record_id', 'redcap_event_name'))
+  
+  #checking columns with conflicts
+  conflicts_for <- as.character()
+  
+  for (column in columns) {
+    column_data <- dplyr::select(test, record_id, redcap_event_name, paste0(column, '.x'), paste0(column, '.y'))
+    column_data <- dplyr::filter(column_data, !is.na(column_data[3]) & !is.na(column_data[4]))
+    
+    #prints rows with conflicts that will be overwritten
+    if (nrow(column_data) >= 1) {
+      print(paste0('conflict found for field: ', column))
+      print.data.frame(column_data)
+      cat("\n")
+      conflicts_for <- c(conflicts_for, column)
+    }
+    
+  }
+  
+  #ask user to check above conflicts and respond 'y'/'n' to import
+  if (length(conflicts_for) >= 1) {
+    cat("Check the datasets above carefully. columns x represent the existing data contents, column y represents the data that will overwrite\n",
+        "If column x contains data, this import will OVERWRITE that existing data\n",
+        "If the cell contents are the same, there is no new data to import")
+  } else {
+    print('no conflicts found. No datasets will be overwritten')
+    
+    print(data) ; cat("check the import data carefully")
+  }
 
-  
-  #ask user to check data import against existing data
-  print(test); cat("Check the dataset above carefully. columns x represent the existing data contents, column y represents the data that will overwrite\n",
-                   "If column x contains data, this import will OVERWRITE that existing data\n",
-                   "If the cell contents are the same, there is no new data to import")
-  
+
   response <- readline(prompt = "Do you want to continue? (y/n): ")
   
   #data import if participant responds y
