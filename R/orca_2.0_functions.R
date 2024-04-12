@@ -158,7 +158,6 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
   screener = get_orca_data(token, "orca_screener_survey")
   screener = select(screener, -redcap_survey_identifier, -rec_unique_record_id, -orca_screener_survey_complete)
   screener = rename(screener, 
-                    screener_record_id = record_id,
                     timestamp = orca_screener_survey_timestamp,
                     language = rec_language_preference,
                     caregiver_firstname = rec_caregiver_name,
@@ -236,8 +235,7 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
       is.na(rec_source) ~ NA
     ))
   
-  screener <- filter(screener, bot_check == 3)
-  col_order <- c("screener_record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rec_source", "rural", "non_white", "low_ses", "priority", "expected_invite_date", "bot_check", "bot_pic_answer")
+  col_order <- c("record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rec_source", "rec_snowball_name", "rec_snowball_email", "rural", "non_white", "low_ses", "priority", "expected_invite_date", "bot_check", "bot_pic_answer", "rec_comments")
   screener <- screener[, col_order]
   screener <- dplyr::arrange(screener, timestamp)
   return (screener)
