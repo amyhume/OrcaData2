@@ -582,3 +582,164 @@ get_eligible_responses <- function(token, min_date_time = "2022-01-01 00:00:00")
   
   return(screener)
 }
+
+
+#' @title Pulling Screener Contact Info
+#' @description Imports contact information from the screener
+#' @param token Unique REDCap API token
+#' @return A data frame with screener record id, caregiver first/last name, phone number, texting preferences and email
+#' @export
+get_screener_contact_info <- function(token) {
+  library(dplyr)
+  screener <- get_orca_data(token, form = "orca_screener_survey")
+  screener <- screener %>%
+    select(record_id, rec_caregiver_name, rec_caregiver_name_last, rec_phone_number, rec_phone_number_text, rec_caregiver_email)
+  
+  return(screener)
+  
+}
+
+
+#' @title Pulling New Snowball Responses
+#' @description Imports new screener responses which have been referred by another person. Will match up the email with the existing participant and put them into another df to compensate. If no id can be found for the email, user will be required to input one
+#' @param token Unique REDCap API token
+#' @param min_date_time The minimum timestamp to pull responses after
+#' @return A list with 'snowball_responses': a df with new responses and the id that referred them, and 'to_compensate': a df with list of ids who have referred people, the number of people referred by them
+#' @export
+get_new_snowball_responses <- function(token, min_date_time = "2022-01-01 00:00:00") {
+  library(dplyr)
+  snowball <- get_orca_data(token, form = "orca_screener_survey")
+  
+  
+  min_date_time <- as.POSIXct(min_date_time, format = "%Y-%m-%d %H:%M:%S")
+  
+  snowball <- snowball %>%
+    filter(orca_screener_survey_timestamp >= min_date_time) %>%
+    filter(rec_source == 2 & !is.na(rec_snowball_email) | !is.na(rec_snowball_name)) %>%
+    filter(is.na(snowball_comp_resolved)) %>%
+    select(record_id, orca_screener_survey_timestamp, rec_source, rec_snowball_name, rec_snowball_email, id_to_compensate, snowball_comp_resolved)
+  
+  contact <- get_screener_contact_info(token)
+  contact <- contact %>%
+    mutate(full_name = paste(rec_caregiver_name, rec_caregiver_name_last))
+  
+  if (nrow(snowball) >= 1) {
+    for (x in 1:nrow(snowball)) {
+      
+      if (!is.na(snowball$rec_snowball_email[x])) {
+        temp <- filter(contact, rec_caregiver_email == snowball$rec_snowball_email[x])
+        id <- ifelse(nrow(temp) >= 1, as.character(temp$record_id[1]), 'cannot find id')
+        
+        snowball[x, 'id_to_compensate'] <- id
+      } else if (!is.na(snowball$rec_snowball_name[x]) & is.na(snowball$rec_snowball_email[x])) {
+        temp <- filter(contact, tolower(full_name) == tolower(snowball$rec_snowball_name[x]))
+        id <- ifelse(nrow(temp) >= 1, as.character(temp$record_id[1]), 'cannot find id')
+        
+        snowball[x, 'id_to_compensate'] <- id
+      } else {
+        snowball[x, 'id_to_compensate'] <- 'manually check'
+      }
+      
+    }
+    
+    #performing manual checks
+    for (x in 1:nrow(snowball)) {
+      if (snowball$id_to_compensate[x] == 'manually check' | snowball$id_to_compensate[x] == 'cannot find id') {
+        cat("Find the screener record ID for the following participant:\n",
+            paste0("Name: ", snowball$rec_snowball_name[x], "\n"),
+            paste0("Email: ", snowball$rec_snowball_email[x], "\n"),
+            "\n",
+            "If they are not an ORCA particiapnt (e.g. Natalie Brito), enter 0\n",
+            "If they are a participant from orca 1.0, enter 1.0_id (e.g. 1.0_067)")
+        
+        response <- readline(prompt = "Enter screener record id: ")
+        snowball$id_to_compensate[x] <- response
+        
+      }
+    }
+    
+    existing_snowball_comps <- get_orca_data(token, form= "prenatal_compensation", form_complete = F)
+    existing_snowball_comps <- existing_snowball_comps %>%
+      filter(!is.na(prenatal_snowball_number)) %>%
+      select(record_id, prenatal_snowball_number, prenatal_snowball_total) %>%
+      mutate(maxed_out = ifelse(prenatal_snowball_total == 50, 1, 0))
+    
+    existing_snowball_comps$record_id <- as.character(existing_snowball_comps$record_id)
+    
+    
+    #creating dataframe of ids to compensate
+    ids_to_compensate <- data.frame(table(snowball$id_to_compensate))
+    ids_to_compensate <- ids_to_compensate %>%
+      filter(Var1 != '0') %>%
+      rename(record_id = Var1, n_new_referrals = Freq) %>%
+      mutate(comp_amount = ifelse(n_new_referrals <= 5, n_new_referrals*10, 50))
+    
+    ids_to_compensate$record_id <- as.character(ids_to_compensate$record_id)
+    
+    ids_to_compensate <- ids_to_compensate %>%
+      left_join(existing_snowball_comps, by="record_id") %>%
+      filter(is.na(maxed_out) | maxed_out == 0)
+    
+    ids_to_compensate <- ids_to_compensate %>%
+      mutate(prenatal_snowball_number = ifelse(!is.na(prenatal_snowball_number), prenatal_snowball_number + n_new_referrals, n_new_referrals),
+             redcap_event_name = "prenatal_surveys_arm_1") 
+    
+    
+    return(list(snowball_responses = snowball, ids_to_compensate = ids_to_compensate))
+  } else {
+    cat("\n", "No new snowball responses!")
+  }
+}
+
+#' @title Pulling ALL Snowball Responses
+#' @description Pulls new screener responses which have been referred by another person and all ids who have referred another person
+#' @param token Unique REDCap API token
+#' @param min_date_time The minimum timestamp to pull responses after
+#' @return A list with 'snowball_responses': a df with new responses and the id that referred them, and 'ids_who_referred': a df with list of ids who have referred people, the number of people referred by them
+#' @export
+get_all_snowball_responses <- function(token, min_date_time = "2022-01-01 00:00:00") {
+  snowball <- get_orca_data(token, form = "orca_screener_survey")
+  
+  
+  min_date_time <- as.POSIXct(min_date_time, format = "%Y-%m-%d %H:%M:%S")
+  
+  snowball <- snowball %>%
+    filter(orca_screener_survey_timestamp >= min_date_time) %>%
+    filter(rec_source == 2 & !is.na(rec_snowball_email) | !is.na(rec_snowball_name)) %>%
+    select(record_id, orca_screener_survey_timestamp, rec_source, rec_snowball_name, rec_snowball_email, id_to_compensate, snowball_comp_resolved)
+  
+  contact <- get_screener_contact_info(token)
+  contact <- contact %>%
+    mutate(full_name = paste(rec_caregiver_name, rec_caregiver_name_last))
+  
+  if (nrow(snowball) >= 1) {
+    for (x in 1:nrow(snowball)) {
+      
+      if (!is.na(snowball$rec_snowball_email[x])) {
+        temp <- filter(contact, rec_caregiver_email == snowball$rec_snowball_email[x])
+        id <- ifelse(nrow(temp) >= 1, as.character(temp$record_id[1]), 'cannot find id')
+        
+        snowball[x, 'id_to_compensate'] <- id
+      } else if (!is.na(snowball$rec_snowball_name[x]) & is.na(snowball$rec_snowball_email[x])) {
+        temp <- filter(contact, tolower(full_name) == tolower(snowball$rec_snowball_name[x]))
+        id <- ifelse(nrow(temp) >= 1, as.character(temp$record_id[1]), 'cannot find id')
+        
+        snowball[x, 'id_to_compensate'] <- id
+      } else {
+        snowball[x, 'id_to_compensate'] <- 'manually check'
+      }
+      
+    }
+  }
+  
+  existing_snowball_comps <- get_orca_data(token, form= "prenatal_compensation", form_complete = F)
+  existing_snowball_comps <- existing_snowball_comps %>%
+    filter(!is.na(prenatal_snowball_number)) %>%
+    select(record_id, prenatal_snowball_number, prenatal_snowball_total, prenatal_snowball_pending) %>%
+    mutate(maxed_out = ifelse(prenatal_snowball_total == 50, 1, 0))
+  
+  existing_snowball_comps$record_id <- as.character(existing_snowball_comps$record_id)
+  
+  return(list(snowball_responses = snowball, ids_who_referred = existing_snowball_comps))
+  
+}
