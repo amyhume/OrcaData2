@@ -10,7 +10,6 @@ url <- 'https://redcap.nyu.edu/api/'
 #' @param form_complete Indicating whether you want to return all responses or just ones marked as complete (default is all)
 #' @return A data frame with the retrieved data
 #' @export
-
 get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_complete = T) {
   if (form_complete) {
     record_filter = paste("[", form, "_complete]=2", sep = "")
@@ -35,7 +34,11 @@ get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_
   
   response <- httr::POST(url, body = formData, encode = "form")
   df <- httr::content(response)
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
+  if (nrow(df) >= 1) {
+    df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
+  } else {
+    print('no data returned - may need to set form_complete = F')
+  }
   return (df)
 }
 
@@ -250,8 +253,8 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
 flag_duplicate_contacts <- function(data) {
   library(dplyr)
   data <- data %>%
-    mutate(duplicate_email = ifelse(!is.na(email) & duplicated(email) & !duplicated(screener_record_id), 1, 0),
-           duplicate_phone = ifelse(!is.na(phone) & duplicated(phone) & !duplicated(screener_record_id), 1, 0))
+    mutate(duplicate_email = ifelse(!is.na(email) & duplicated(email) & !duplicated(record_id), 1, 0),
+           duplicate_phone = ifelse(!is.na(phone) & duplicated(phone) & !duplicated(record_id), 1, 0))
   return(data)
 }
 
