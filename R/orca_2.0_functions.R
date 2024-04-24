@@ -238,7 +238,7 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
       is.na(rec_source) ~ NA
     ))
   
-  col_order <- c("record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rec_source", "rec_snowball_name", "rec_snowball_email", "rural", "non_white", "low_ses", "priority", "expected_invite_date", "bot_check", "bot_pic_answer", "rec_comments")
+  col_order <- c("record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rec_source", "rec_snowball_email", "rural", "non_white", "low_ses", "priority","rec_comments", "expected_invite_date", "bot_check", "bot_pic_answer")
   screener <- screener[, col_order]
   screener <- dplyr::arrange(screener, timestamp)
   return (screener)
@@ -252,9 +252,23 @@ get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
 #' @export
 flag_duplicate_contacts <- function(data) {
   library(dplyr)
-  data <- data %>%
-    mutate(duplicate_email = ifelse(!is.na(email) & duplicated(email) & !duplicated(record_id), 1, 0),
-           duplicate_phone = ifelse(!is.na(phone) & duplicated(phone) & !duplicated(record_id), 1, 0))
+  all_emails <- get_orca_field(token, field = 'rec_caregiver_email')
+  all_phones <- get_orca_field(token, field = 'rec_phone_number')
+  
+  for (row in 1:nrow(data)) {
+    temp_email <- all_emails %>%
+      filter(rec_caregiver_email == data$email[row])
+    temp_phones <- all_phones %>%
+      filter(rec_phone_number == data$phone[row])
+    if (nrow(temp_email) > 1) {
+      data[row, 'duplicate_email'] = 1
+    } else {data[row, 'duplicate_email'] = 0}
+    
+    if(nrow(temp_phones) > 1) {
+      data[row, 'duplicate_phone'] = 1
+    } else {data[row, 'duplicate_phone'] = 0}
+  }
+
   return(data)
 }
 
@@ -340,10 +354,10 @@ screen_fraudulence <- function(data) {
     filter(bot_check != 3 & bot_pic_answer != 4)
   #removing NA names, numeric names, under 18 caregivers, duplicate contact info and age_ineligible babies
   data <- data %>%
+    filter(!is.na(phone) | !is.na(email)) %>%
     filter(!is.na(caregiver_name) & over_18 == "Yes" & num_name_flag == 0 & age_ineligible == 0 & incorrect_due_date == 0) %>%
     filter(bot_check == 3) %>%
-    filter(duplicate_email == 0 & duplicate_phone == 0) %>%
-    filter(!is.na(phone) | !is.na(email))
+    filter(duplicate_email == 0 & duplicate_phone == 0) 
   #removing excess columns other than flagged lowercase names 
   data <- data %>%
     select(-age_ineligible, -duplicate_email, -duplicate_phone, -num_name_flag, -incorrect_due_date, -bot_check, -bot_pic_answer)
