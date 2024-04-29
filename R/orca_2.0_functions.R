@@ -582,7 +582,6 @@ calculate_itn <- function(data) {
 #' @export
 get_eligible_responses <- function(token, min_date_time = "2022-01-01 00:00:00") {
   screener <- get_orca_screener(token, min_date_time = min_date_time)
-  screener <- dplyr::rename(screener, record_id = screener_record_id)
   eligible <- get_orca_field(token, field='orca_contact_yesno')
   
   eligible <- dplyr::filter(eligible, orca_contact_yesno == 1)
