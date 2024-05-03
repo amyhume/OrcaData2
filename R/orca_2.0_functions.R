@@ -369,8 +369,7 @@ screen_fraudulence <- function(data) {
 #' @return A data frame with every us zipcode and information
 #' @export
 zip_data <- function() {
-  data_path <- system.file("data", "zip_code_database.csv", package = "OrcaData")
-  data <- read.csv(data_path, na.strings = "")
+  data_path <- system.file("Data", "zip_code_database.csv", package = "OrcaData2")
   data$zipcode <- as.character(data$zipcode)
   data$zipcode <- sprintf("%05s", data$zipcode)
   data <- dplyr::mutate(data,
