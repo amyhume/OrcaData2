@@ -392,6 +392,7 @@ zip_data <- function() {
 #' @return A summary of data to be imported/overwritten and requires user input (y) to continue with import
 #' @export
 import_data <- function(token, data = data) {
+  library(redcapAPI)
   unique_events <- unique(data$redcap_event_name)
   
   #pulling existing redcap data
