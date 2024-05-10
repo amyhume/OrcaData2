@@ -73,7 +73,7 @@ get_orca_field <- function(token = token, field=field, raw_v_label = 'raw') {
   df[df == -999] = NA
   df[df == 999] = NA
   df[df == 9999] = NA
-  df <- dplyr::select(df, record_id, redcap_event_name, field)
+  df <- dplyr::select(df, record_id, redcap_event_name, all_of(field))
   df <- df[!is.na(df[[field]]),]
   df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
   return (df)
@@ -758,4 +758,23 @@ get_all_snowball_responses <- function(token, min_date_time = "2022-01-01 00:00:
   
   return(list(snowball_responses = snowball, ids_who_referred = existing_snowball_comps))
   
+}
+
+#' Generating N for Specified Timepoint
+#'
+#' This function with return a numeric variable for the number of people who have completed a particular timepoint
+#'
+#' @param token Unique REDCap token ID
+#' @param timepoint integer reflecting the timepoint (4,8,12)
+#' @return Numeric variable for that event
+#' @export
+get_visit_n <- function(token, timepoint = 4) {
+  
+  if (timepoint == 4) {
+    data <- get_orca_field(token, field="visit_date_4m")
+    n <- nrow(data)
+    return(n)
+  } else {
+    print('no visit data available yet for any timepoints other than 4m. Enter timepoint = 4 to see')
+  }
 }
