@@ -520,8 +520,12 @@ clean_birthweight <- function(data) {
   
   for (row in 1:nrow(data)) {
     
-    if (str_detect(data$child_birth_weight[row], "lbs")) {
+    if (str_detect(data$child_birth_weight[row], "lbs") | str_detect(data$child_birth_weight[row], "libras")) {
       data$child_birth_weight[row] <- gsub("lbs", ",", data$child_birth_weight[row])
+      data$child_birth_weight[row] <- gsub("libras", ",", data$child_birth_weight[row])
+    } else if (str_detect(data$child_birth_weight[row], "lb") | str_detect(data$child_birth_weight[row], "libra")) {
+      data$child_birth_weight[row] <- gsub("lb", ",", data$child_birth_weight[row])
+      data$child_birth_weight[row] <- gsub("libra", ",", data$child_birth_weight[row])
     } else if (str_detect(data$child_birth_weight[row], " ") & !str_detect(data$child_birth_weight[row], ",")) {
       data$child_birth_weight[row] <- gsub(" ", ",", data$child_birth_weight[row])
       
@@ -530,7 +534,7 @@ clean_birthweight <- function(data) {
   
   
   data <- data %>%
-    separate(child_birth_weight, into = c("child_birth_lb", "child_birth_oz"), sep = ",", remove = F)
+    separate(child_birth_weight, into = c("child_birth_lb", "child_birth_oz"), sep = ",(?=[^,]+$)", remove = F)
   
   data <- data %>%
     mutate(child_birth_lb = parse_number(child_birth_lb),
@@ -557,20 +561,23 @@ calculate_itn <- function(data) {
     household_n = c(1,2,3,4,5,6,7,8),
     income_threshold = c(15060,20440,25820,31200,36580,41960,47340,52720)
   )
-  
+  data$annual_income <- as.numeric(data$annual_income)
+  data <- dplyr::mutate(data, itn = NA)
   for (row in 1:nrow(data)) {
     total_household = (data$children_home[row] + data$adults_home[row])
-    
-    if (total_household <= 8) {
+    if (!is.na(total_household) & total_household <= 8) {
       index <- which(poverty_guidelines$household_n == total_household)
+    } else if (is.na(total_household)) {
+      index = NA
     } else {
       index = 8
     }
     
-    threshold = poverty_guidelines$income_threshold[index]
-    data$itn[row] <- data$annual_income[row] / threshold
+    if (!is.na(index)) {
+      threshold = poverty_guidelines$income_threshold[index]
+      data$itn[row] <- data$annual_income[row] / threshold
+    } 
   }
-  
   return(data)
 }
 
@@ -778,3 +785,68 @@ get_visit_n <- function(token, timepoint = 4) {
     print('no visit data available yet for any timepoints other than 4m. Enter timepoint = 4 to see')
   }
 }
+
+
+#Survey functions
+#' @title Process EPDS postpartum depression data
+#'
+#' @description This function will download and return the totalsummed scores for the EPDS. Only total scores, and not cutoff values, are returned.
+#'
+#' @param token Unique REDCap token ID
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_epds <- function(token, timepoint = 'orca_4month_arm_1') {
+  epds = get_orca_data(token, "edinburgh_postnatal_depression_scale", form_complete = T)
+  epds <- dplyr::filter(epds, redcap_event_name == timepoint)
+  epds = epds[,c("record_id", "epds_total", "epds_dep", "epds_anx")]
+  return (epds)
+}
+
+
+#' @title Process Perceived Stress Scale Data
+#'
+#' @description This function will download and return the total scores for pss
+#'
+#' @param token Unique REDCap token ID
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_pss <- function(token, timepoint = 'orca_4month_arm_1') {
+  pss <- get_orca_data(token, form = 'perceived_stress_scale', form_complete=T)
+  pss <- dplyr::filter(pss, redcap_event_name == timepoint)
+  pss = pss[,c("record_id", "pss_date", "pss_score", "pss_14_score", 'pss_10_score_cutoff')]
+  return (pss)
+}
+
+#' @title Process Postpartum Bonding Questionnaire Scores
+#'
+#' @description This function will download and return the total scores for pbq
+#'
+#' @param token Unique REDCap token ID
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_pbq <- function(token, timepoint='orca_4month_arm_1') {
+  library(dplyr)
+  pbq <- get_orca_data(token, form='postpartum_bonding_questionnaire', form_complete = T)
+  pbq <- dplyr::filter(pbq, redcap_event_name == timepoint)
+  
+  pbq$impaired_bonding <- rowSums(pbq[, c("pbq1", "pbq2", "pbq6", "pbq7", "pbq8", "pbq9", "pbq10",
+                                          "pbq12", "pbq13", "pbq15","pbq16", "pbq17")], na.rm = TRUE)
+  pbq$rpa <- rowSums(pbq[, c("pbq3", "pbq4", "pbq5", "pbq11", "pbq14", "pbq21", "pbq23")], na.rm = TRUE)
+  
+  pbq$if_anxiety <- rowSums(pbq[, c("pbq19", "pbq20", "pbq22", "pbq25")], na.rm = TRUE)
+  
+  pbq$inc_abuse <- rowSums(pbq[, c("pbq18", "pbq24")], na.rm = TRUE)
+  
+  #cutoffs
+  pbq <- pbq %>%
+    mutate(ib_cutoff = ifelse(impaired_bonding >= 12, 1, 0),
+           rpa_cutoff = ifelse(rpa >= 13, 1, 0),
+           if_anxiety_cutoff = ifelse(if_anxiety >=10, 1, 0),
+           inc_abuse_cutoff = ifelse(inc_abuse >= 3, 1,0))
+  
+  pbq <- pbq %>%
+    select(record_id, postpartum_bonding_questionnaire_timestamp, impaired_bonding:inc_abuse_cutoff)
+  
+  return(pbq)
+}
+
