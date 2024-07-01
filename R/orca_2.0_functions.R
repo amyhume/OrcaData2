@@ -272,17 +272,6 @@ flag_duplicate_contacts <- function(data) {
   return(data)
 }
 
-#' @title Lowercase Names
-#' @description Flags any participant where their name is all lowercase
-#' @param data The data frame you wish to act on
-#' @return A dataframe with a new column marking 1 for anybody with an all lowercase names
-#' @export
-flag_lowercase_names <- function(data) {
-  library(dplyr)
-  data <- data %>%
-    mutate(lower_name_flag = ifelse(!grepl("[[:upper:]]", caregiver_name), 1, 0))
-  return(data)
-}
 
 
 #' @title Flagging Numeric Names
@@ -329,6 +318,35 @@ flag_due_dates <- function(data) {
   return(data)
 }
 
+#' @title Flagging Suspicious Referrals
+#' @description Checks to see if snowball responses were referred by somebody we have flagged
+#' @param data The data frame you wish to act on
+#' @param token Unique REDCap API token
+#' @param flagged_emails Data frame containing known flagged emails
+#' @return A dataframe with a new column marking 1 for anybody with flagged emails
+#' @export
+flag_referrals <- function(data, token, flagged_emails) {
+  library(dplyr)
+  ineligible <- get_orca_field(token, field='orca_contact_yesno')
+  emails <- get_orca_field(token, 'rec_caregiver_email')
+  
+  ineligible <- ineligible %>%
+    filter(orca_contact_yesno == 0) %>%
+    left_join(emails, by='record_id') %>%
+    select(-redcap_event_name.x, -redcap_event_name.y)
+  
+  data <- data %>%
+    mutate(flagged_referral = NA)
+  for (row in 1:nrow(data)) {
+    if (!is.na(data$rec_snowball_email[row])) {
+      if (data$rec_snowball_email[row] %in% flagged_emails$rec_caregiver_email | data$rec_snowball_email[row] %in% ineligible$rec_caregiver_email) {
+        data[row, 'flagged_referral'] <- 1
+      } 
+    }
+  }
+  return(data)
+}
+
 #' @title Screens screener export
 #' @description Checks for: duplicate contact info, under 18, numeric names, NA names/emails, babies above age threshold, names all lowercase
 #' @param data The data frame you wish to act on
@@ -339,9 +357,9 @@ screen_fraudulence <- function(data) {
   data <- data %>%
     flag_ineligible_age(threshold_date = Sys.Date() - 135) %>%
     flag_duplicate_contacts() %>%
-    flag_lowercase_names() %>%
     flag_numeric_names() %>%
-    flag_due_dates()
+    flag_due_dates() %>%
+    flag_referrals(token, flagged_emails)
   
   #creating new datasets
   ineligible_ages <- data %>%
@@ -352,16 +370,19 @@ screen_fraudulence <- function(data) {
     filter(incorrect_due_date == 1)
   failed_attention_checks <- data %>%
     filter(bot_check != 3 & bot_pic_answer != 4)
+  flagged_referrals <- data %>%
+    filter(flagged_referral == 1)
   #removing NA names, numeric names, under 18 caregivers, duplicate contact info and age_ineligible babies
   data <- data %>%
     filter(!is.na(phone) | !is.na(email)) %>%
     filter(!is.na(caregiver_name) & over_18 == "Yes" & num_name_flag == 0 & age_ineligible == 0 & incorrect_due_date == 0) %>%
     filter(bot_check == 3) %>%
-    filter(duplicate_email == 0 & duplicate_phone == 0) 
-  #removing excess columns other than flagged lowercase names 
+    filter(duplicate_email == 0 & duplicate_phone == 0)  %>%
+    filter(is.na(flagged_referral))
+  #removing excess columns
   data <- data %>%
-    select(-age_ineligible, -duplicate_email, -duplicate_phone, -num_name_flag, -incorrect_due_date, -bot_check, -bot_pic_answer)
-  return(list(data = data, ineligible_ages = ineligible_ages, duplicate_contacts = duplicate_contacts, impossible_due_dates = impossible_due_dates, failed_attention_checks = failed_attention_checks))
+    select(-age_ineligible, -duplicate_email, -duplicate_phone, -num_name_flag, -incorrect_due_date, -bot_check, -bot_pic_answer, -flagged_referral)
+  return(list(data = data, ineligible_ages = ineligible_ages, duplicate_contacts = duplicate_contacts, impossible_due_dates = impossible_due_dates, failed_attention_checks = failed_attention_checks, flagged_referrals = flagged_referrals))
 }
 
 #' @title Pulls US zipcode database
@@ -850,3 +871,76 @@ get_orca_pbq <- function(token, timepoint='orca_4month_arm_1') {
   return(pbq)
 }
 
+#' @title Process IBQ Data
+#' @description This function will download and return the mean scores for the IBQ subscales (surgency, negative affect, effortful control).
+#' @param token Unique REDCap token ID
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_ibq <- function(token) {
+  ibq <- get_orca_data(token, form = 'infant_behavior_questionnaire_very_short_form')
+  #reversing item 11
+  ibq[ibq== 999] = NA
+  ibq$ibq11r <- (8-ibq$ibq_11)
+  ibq$ibq_sur <- rowMeans(ibq[, c("ibq_01", "ibq_02", "ibq_07", "ibq_08", "ibq_13", "ibq_14", "ibq_15", 
+                                  "ibq_20", "ibq_21", "ibq_26", "ibq_27", "ibq_36", "ibq_37")], na.rm = TRUE)
+  ibq$ibq_neg <- rowMeans(ibq[, c("ibq_03", "ibq_04", "ibq_09", "ibq_10", "ibq_16", "ibq_17", "ibq_22", 
+                                  "ibq_23", "ibq_28", "ibq_29", "ibq_32", "ibq_33")], na.rm = TRUE)
+  ibq$ibq_ec <- rowMeans(ibq[, c("ibq_05", "ibq_06", "ibq11r", "ibq_12", "ibq_18", "ibq_19", "ibq_24", 
+                                 "ibq_25", "ibq_30", "ibq_31", "ibq_34", "ibq_35")], na.rm = TRUE)
+  
+  
+  ibq <- ibq[, c("record_id", "infant_behavior_questionnaire_very_short_form_timestamp", "ibq_sur", "ibq_neg", "ibq_ec")]
+  
+  return(ibq)
+}
+
+#'@title Determine Study Eligibility
+#'@description Takes a screener df and bins participants into different studies depending on age/demographic priority
+#'@param data screener dataframe to act upon. Must contain 'child_dob' and 'priority' columns 
+#'@return a dataframe with new column 'orca_study_enrollment' added
+#'@export
+study_eligibility <- function(data) {
+  library(dplyr)
+  data$current_age <- as.numeric(difftime(Sys.Date(), data$child_dob, units = 'days'))
+  
+  if ('child_dob' %in% colnames(data) & 'priority' %in% colnames(data)) {
+    data$current_age <- as.numeric(difftime(Sys.Date(), data$child_dob, units = 'days'))
+    
+    data <- data %>%
+      mutate(orca_study_enrollment = case_when(
+        current_age > 137 & current_age <= 304 ~ 'ORCA 1.0',
+        current_age <= 137 & priority == 'High Priority' ~ 'ORCA 2.0',
+        current_age < 91 & priority == 'Low Priority' ~ 'ORCA 2.0',
+        pregnant_yesno == 1 & priority == 'High Priority' ~ 'ORCA 2.0',
+        current_age >= 91 & current_age <= 137 & priority == 'Low Priority' ~ 'MICE BL',
+        pregnant_yesno == 1 & priority == 'Low Priority' ~ 'MICE',
+        pregnant_yesno == 0 & current_age > 304 ~ 'ineligible_age'
+      ))
+    
+    data <- data %>%
+      select(-current_age)
+  } else {
+    print('either child_dob or priority columns not present in the data. Check')
+  }
+
+  return(data)
+}
+
+#' @title Process QUIC 5 Data
+#' @description This function will download and return the total scores for the quic 5
+#' @param token Unique REDCap token ID
+#' @param timepoint redcap event name for the timepoint you wish to pull
+#' @return A data frame for the completed surveys
+#' @export
+get_quic5 <- function(token, timepoint = "orca_4month_arm_1") {
+  library(dplyr)
+  quic5 = get_orca_data(token, "quic_5")
+  quic5 = dplyr::filter(quic5, redcap_event_name == timepoint)
+  
+  quic5$quic5_1r = 1 - quic5$quic5_1r
+  quic5$quic5_4r = 1 - quic5$quic5_4r
+  quic5$quic5_all = quic5$quic5_1r + quic5$quic5_2 + quic5$quic5_3 + quic5$quic5_4r
+  
+  quic5 = quic5[,c("record_id", "quic_5_timestamp","quic5_all")]
+  return (quic5)
+}
