@@ -149,6 +149,80 @@ city_info <- function() {
   return(cities)
 }
 
+#' @title Calculate Rurality
+#' @description this function returns rural/non rural status for given zipcodes
+#' @param zip_code vector of zipcodes to act on (must be 5 digits)
+#' @param population_threshold numeric value for population cut off for rural/non rural
+#' @return a vector of rural/non rural/na statuses
+#' @export
+calculate_rurality <- function(zip_code, population_threshold=50000) {
+  zip_info <- zips()
+  cities <- city_info()
+  
+  zip_code <- data.frame(zipcode = zip_code)
+  zip_code$zipcode <- as.character(zip_code$zipcode)
+  zip_info$zipcode <- sprintf("%05d", zip_info$zipcode)
+  zip_info$zipcode <- as.character(zip_info$zipcode)
+  
+  data <- left_join(zip_code, zip_info, by="zipcode")
+  data <- left_join(data, cities, by='location')
+  
+  data <- mutate(data,
+                 rural = ifelse(is.na(population) & !is.na(location), "Y",
+                                ifelse(population >= population_threshold, "N",
+                                       ifelse(population < population_threshold, "Y", "CHECK"))))
+  
+  rural <- data$rural
+  
+  return(rural)
+}
+
+#' @title Calculate Timezone
+#' @description this function returns timezones for given zipcodes
+#' @param zip_code vector of zipcodes to act on (must be 5 digits)
+#' @return a vector of timezones for zipcodes
+#' @export
+calculate_timezone <- function(zip_code) {
+  zip_info <- zips()
+  cities <- city_info()
+  
+  zip_code <- data.frame(zipcode = zip_code)
+  zip_code$zipcode <- as.character(zip_code$zipcode)
+  zip_info$zipcode <- sprintf("%05d", zip_info$zipcode)
+  zip_info$zipcode <- as.character(zip_info$zipcode)
+  
+  data <- left_join(zip_code, zip_info, by="zipcode")
+  
+  tz = data$timezone
+  
+  return(tz)
+}
+
+#' @title Calculate all zipcode info
+#' @description this function pulls location, timezone, population size and rurality for given zipcodes
+#' @param zip_code vector of zipcodes to act on (must be 5 digits)
+#' @param population_threshold numeric value for population cut off for rural/non rural
+#' @return a dataframe with zipcode, location, timezone, population size and rurality
+#' @export
+get_zip_info <- function(zip_code, population_threshold=50000) {
+  zip_info <- zips()
+  cities <- city_info()
+  
+  zip_code <- data.frame(zipcode = zip_code)
+  zip_code$zipcode <- as.character(zip_code$zipcode)
+  zip_info$zipcode <- sprintf("%05d", zip_info$zipcode)
+  zip_info$zipcode <- as.character(zip_info$zipcode)
+  
+  data <- left_join(zip_code, zip_info, by="zipcode")
+  data <- left_join(data, cities, by='location')
+  
+  data <- mutate(data,
+                 rural = ifelse(is.na(population) & !is.na(location), "Y",
+                                ifelse(population >= 50000, "N",
+                                       ifelse(population < 50000, "Y", "CHECK"))))
+  
+  return(data)
+}
 
 #' @title Pulling cleaned screener responses 
 #' @description this function pulls and cleans screener data for import to excel tracker 
