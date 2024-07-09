@@ -1018,3 +1018,31 @@ get_quic5 <- function(token, timepoint = "orca_4month_arm_1") {
   quic5 = quic5[,c("record_id", "quic_5_timestamp","quic5_all")]
   return (quic5)
 }
+
+#' @title Get Missing REDCap IDs
+#' @description This function will pull any missing consecutive ids from redcap (that may need to be reassigned)
+#' @param token Unique REDCap token ID
+#' @return A numeric vector with the missing ids
+#' @export
+get_missing_ids <- function(token) {
+  library(dplyr)
+  all_ids <- get_all_data(token)
+  
+  all_ids <- all_ids %>%
+    distinct(record_id,.keep_all = T) %>%
+    select(record_id) %>%
+    filter(!str_detect(tolower(record_id), 'test') & !str_detect(tolower(record_id), 'p'))
+  
+  x <- min(all_ids$record_id):max(all_ids$record_id)
+  
+  missing_ids <- as.numeric()
+  
+  for (n in x) {
+    if (n %in% all_ids$record_id) {
+    } else {
+      missing_ids <- c(missing_ids, n)
+    }
+  }
+  
+  return(missing_ids)
+}
