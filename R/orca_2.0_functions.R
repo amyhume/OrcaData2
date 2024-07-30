@@ -1046,3 +1046,42 @@ get_missing_ids <- function(token) {
   
   return(missing_ids)
 }
+
+#' @title Assign New Ids
+#' @description this function will take existing ids and create new ones for new participants. It will fill missing ids.
+#' @param existing_ids a vector of existing ids
+#' @param new_participants a vector or new participants you want to create ids for 
+#' @param prefix a string prefix if required in id format  e.g. 'pch_' for pch_001
+#' @param digits the number of digits in your id e.g. 3 for pch_001
+#' @return A numeric vector with the missing ids
+#' @export
+assign_ids <- function(existing_ids, new_participants, prefix, digits=3) {
+  existing_ids <- as.numeric(gsub(prefix, '', existing_ids))
+  
+  #checking for missing ids
+  if (length(existing_ids) >= 1) {
+    complete_sequence <- seq(min(existing_ids), max(existing_ids))
+    missing_numbers <- setdiff(complete_sequence, existing_ids)
+  } else {
+    missing_numbers = as.numeric()
+    existing_ids = 0
+  }
+  
+  new_ids = as.numeric()
+  if (length(missing_numbers) >= 1) {
+    new_ids <- missing_numbers
+  }
+  
+  start_n = length(new_ids)+1
+  next_id = max(existing_ids) + 1
+  new_id = next_id
+  
+  for (x in start_n:length(new_participants)) {
+    new_ids <- c(new_ids, new_id)
+    new_id <- new_id + 1
+  }
+  
+  digits = paste0("%0", digits, "d")
+  new_ids <- paste0(prefix, sprintf(digits, new_ids))
+  return(new_ids)
+}
