@@ -1085,3 +1085,39 @@ assign_ids <- function(existing_ids, new_participants, prefix, digits=3) {
   new_ids <- paste0(prefix, sprintf(digits, new_ids))
   return(new_ids)
 }
+
+#' @title Getting Trimester Numbers
+#' @description This function will pull the number of prenatal participants in trimester 1, 2,3
+#' @param token REDCap API token for SCREENER project
+#' @param field string variable for name of your due date field, default is rec_due_date
+#' @return A dataframe with 'trimester' and 'n' column
+#' @export
+get_trimester_n <- function(token, field = 'rec_due_date') {
+  library(dplyr)
+  due_date <- get_orca_field(token, field='rec_due_date')
+  eligibility <- get_orca_field(token, field='orca_contact_yesno')
+  
+  due_date <- due_date %>%
+    left_join(eligibility, by='record_id') %>%
+    select(record_id, rec_due_date, orca_contact_yesno) %>%
+    filter(orca_contact_yesno == 1)
+  
+  due_date <- due_date %>%
+    filter(rec_due_date > Sys.Date())
+  
+  due_date$weeks_till_birth <- difftime(due_date$rec_due_date, Sys.Date(),units='w')
+  due_date$gestational_age <- 40 - due_date$weeks_till_birth
+  
+  due_date <- due_date %>%
+    mutate(trimester = case_when(
+      gestational_age < 13 ~ 't1',
+      gestational_age >= 13 & gestational_age < 27 ~ 't2',
+      gestational_age >= 27 ~ 't3'
+    ))
+  
+  trimesters <- data.frame(table(due_date$trimester))
+  trimesters <- trimesters %>%
+    rename(trimester = Var1, n = Freq)
+  
+  return(trimesters)
+}
