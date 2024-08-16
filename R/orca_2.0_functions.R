@@ -984,10 +984,10 @@ study_eligibility <- function(data) {
     data <- data %>%
       mutate(orca_study_enrollment = case_when(
         current_age > 137 & current_age <= 304 ~ 'ORCA 1.0',
-        current_age <= 137 & priority == 'High Priority' ~ 'ORCA 2.0',
+        current_age >= 60 & current_age <= 137 ~ 'MICE BL',
+        current_age < 60 & current_age > 0 ~ 'ORCA 2.0',
         current_age < 91 & priority == 'Low Priority' ~ 'ORCA 2.0',
         pregnant_yesno == 1 & priority == 'High Priority' ~ 'ORCA 2.0',
-        current_age >= 91 & current_age <= 137 & priority == 'Low Priority' ~ 'MICE BL',
         pregnant_yesno == 1 & priority == 'Low Priority' ~ 'MICE',
         pregnant_yesno == 0 & current_age > 304 ~ 'ineligible_age'
       ))
