@@ -1122,3 +1122,45 @@ get_trimester_n <- function(token, field = 'rec_due_date') {
   
   return(trimesters)
 }
+
+#' @title Process STAI 5 Data
+#' @description This function will download and return the total state and trait scores for the stai 5
+#' @param token Unique REDCap token ID
+#' @param timepoint redcap event name for the timepoint you wish to pull
+#' @return A data frame for the completed surveys
+#' @export
+get_stai5 <- function(token, timepoint = "orca_4month_arm_1") {
+  library(dplyr)
+  stai5 = get_orca_data(token, "state_trait_anxiety_inventory")
+  stai5 = dplyr::filter(stai5, redcap_event_name == timepoint)
+  
+  stai5 <- dplyr::filter(stai5, redcap_event_name == timepoint)
+  stai5$stais <- rowSums(stai5[, c("stais1", "stais2", "stais3", "stais4", "stais5")], na.rm = TRUE)
+  stai5$stait <- rowSums(stai5[, c("stait1", "stait2", "stait3", "stait4", "stait5")], na.rm = TRUE)
+  stai5 <- stai5 %>% mutate(s_cutoff = ifelse(stais > 9.5, 1, 0), t_cutoff = ifelse(stait > 13.5, 1, 0))
+  
+  stai5 <- stai5 %>% select("record_id", "state_trait_anxiety_inventory_timestamp","stais", "stait", "s_cutoff", "t_cutoff")
+  return(stai5)
+}
+
+#' @title Process Difficulties in Emotion Regulation Data
+#' @description This function will download and return the total scores for each subscale of the DERS
+#' @param token Unique REDCap token ID
+#' @param timepoint redcap event name for the timepoint you wish to pull
+#' @return A data frame for the completed surveys
+#' @export
+get_ders <- function(token, timepoint = "orca_4month_arm_1") {
+  library(dplyr)
+  ders = get_orca_data(token, "difficulties_in_emotional_regulation_16")
+  ders = dplyr::filter(ders, redcap_event_name == timepoint)
+  
+  ders <- dplyr::filter(ders, redcap_event_name == timepoint)
+  ders$total_score <- rowSums(ders[, c("ders_1", "ders_2", "ders_3", "ders_4", "ders_5", "ders_6", "ders_7", "ders_8", "ders_9", "ders_10", "ders_11", "ders_12", "ders_13", "ders_14", "ders_15", "ders_16")], na.rm = TRUE)
+  ders$clarity <- rowSums(ders[, c("ders_1", "ders_2")], na.rm = TRUE)
+  ders$goals <- rowSums(ders[, c("ders_3", "ders_7", "ders_15")], na.rm = TRUE)
+  ders$impulse <- rowSums(ders[, c("ders_4", "ders_8", "ders_11")], na.rm = TRUE)
+  ders$strategies <- rowSums(ders[, c("ders_5", "ders_6", "ders_12", "ders_14", "ders_16")], na.rm = TRUE)
+  ders$nonacceptance <- rowSums(ders[, c("ders_9", "ders_10")], na.rm = TRUE)
+  ders <- ders %>% select("record_id", "difficulties_in_emotional_regulation_16_timestamp","total_score", "clarity", "goals", "impulse", "strategies", "nonacceptance")
+  return(ders)
+}
