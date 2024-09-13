@@ -877,9 +877,14 @@ get_visit_n <- function(token, timepoint = 4) {
     data <- get_orca_field(token, field="visit_date_4m")
     n <- nrow(data)
     return(n)
+  } else if (timepoint == 8){
+    data <- get_orca_field(token, field="visit_date_8m")
+    n <- nrow(data)
+    return(n)
   } else {
-    print('no visit data available yet for any timepoints other than 4m. Enter timepoint = 4 to see')
+    print('no visit data available yet for any timepoints other than 4m and 8m. Enter timepoint = 4 or 8 to see')
   }
+  
 }
 
 
@@ -1163,4 +1168,255 @@ get_ders <- function(token, timepoint = "orca_4month_arm_1") {
   ders$nonacceptance <- rowSums(ders[, c("ders_9", "ders_10")], na.rm = TRUE)
   ders <- ders %>% select("record_id", "difficulties_in_emotional_regulation_16_timestamp","total_score", "clarity", "goals", "impulse", "strategies", "nonacceptance")
   return(ders)
+}
+
+#' @title Pull Screener Child DOB
+#' @description This function will download and return the most up to date date of birth value from the screener
+#' @param token Unique REDCap token ID
+#' @return A data frame with all 3 dob variables (due date, rec_child_dob and child_dob_update) and final dob
+#' @export
+get_screener_child_dob <- function(token) {
+  library(dplyr)
+  cohort <- get_orca_cohort(token, screener=T)
+  due_date <- get_orca_field(token, field='rec_due_date') 
+  dob <- get_orca_field(token, field='rec_child_dob')
+  dob2 <- get_orca_field(token, field='child_dob_update')
+  
+  total <- cohort %>%
+    left_join(due_date, by='record_id') %>%
+    left_join(dob, by='record_id') %>%
+    left_join(dob2, by='record_id') %>%
+    select(record_id, rec_due_date, rec_child_dob, child_dob_update)
+  
+  total <- total %>%
+    mutate(final_dob = ifelse(is.na(rec_due_date) & is.na(child_dob_update) & !is.na(rec_child_dob), rec_child_dob,
+                              ifelse(!is.na(rec_due_date) & is.na(child_dob_update), rec_due_date,
+                                     ifelse(!is.na(rec_due_date) & !is.na(child_dob_update), child_dob_update,
+                                            ifelse(!is.na(rec_due_date) & !is.na(rec_child_dob) & !is.na(child_dob_update), child_dob_update,
+                                                   ifelse(is.na(rec_due_date) & !is.na(rec_child_dob) & !is.na(child_dob_update), child_dob_update, 'ERROR'))))))
+  
+  total$final_dob <- as.numeric(total$final_dob)
+  total$final_dob <- as.Date(total$final_dob, origin='1970-01-01')
+  
+  return(total)
+  
+}
+
+#' @title Pull Records in Cohort
+#' @description This function will pull all records in a particular cohort (default is main ORCA postnatal)
+#' @param token Unique REDCap token ID
+#' @param screener Set to 'T' to pull screener cohort (prospective/prenatal)
+#' @return A dataframe with all record ids included in cohort 
+#' @export
+get_orca_cohort <- function(token, screener=F) {
+  library(dplyr)
+  
+  if (!screener) {
+    records <- get_orca_field(token, field='record_id')
+    records <- records %>%
+      filter(redcap_event_name == 'orca_4month_arm_1') %>%
+      select(record_id)
+    
+    #eligibility fields
+    to_keep <- get_orca_field(token, field='optout_yesno') %>%
+      select(-redcap_event_name)
+    
+    long <- get_orca_field(token, field='longitudinal_yesno') %>%
+      select(-redcap_event_name)
+    
+    records <- records %>%
+      left_join(to_keep, by="record_id") %>%
+      left_join(long, by='record_id')
+    
+    records <- records %>%
+      filter(optout_yesno == 0 | is.na(optout_yesno)) %>%
+      filter(longitudinal_yesno != 0 & !is.na(longitudinal_yesno))
+    
+    records <- records %>%
+      select(record_id)
+    
+    
+    #visit date info
+    date_4m <- get_orca_field(token, field='visit_date_4m')
+    date_8m <- get_orca_field(token, field='visit_date_8m')
+    #date_12m <- get_orca_field(token, field='visit_date_12m')
+    
+    visit_dates <- date_4m %>%
+      left_join(date_8m, by='record_id') #%>%
+    #left_join(date_12m)
+    
+    cols <- colnames(visit_dates)[!str_detect(colnames(visit_dates), 'redcap_event_name')]
+    visit_dates <- visit_dates[, cols]
+    
+    records <- records %>%
+      left_join(visit_dates, by='record_id')
+    
+    return(records)
+    
+    
+  } else if (screener) {
+    records <- get_orca_field(token, field='record_id')
+    records <- records %>%
+      filter(redcap_event_name == 'orca_screener_arm_1') %>%
+      select(-redcap_event_name)
+    
+    #pulling enrollment info
+    eligibility <- get_orca_data(token, form='contact_log', form_complete = F) %>%
+      filter(redcap_event_name=='orca_screener_arm_1')
+    
+    eligibility <- eligibility %>%
+      filter(orca_study_enrollment___2 == 0) %>%
+      select(record_id, orca_contact_yesno, orca_study_enrollment___1,orca_study_enrollment___3:orca_study_enrollment___6) %>%
+      rename(orca = orca_study_enrollment___1, mice = orca_study_enrollment___3,
+             mice_baseline = orca_study_enrollment___4, peach = orca_study_enrollment___5,
+             reef = orca_study_enrollment___6
+      )
+    
+    
+    records <- records %>%
+      left_join(eligibility, by='record_id') %>%
+      filter(orca_contact_yesno == 1)
+    
+    records <- records %>%
+      select(-orca_contact_yesno)
+    
+    return(records)
+    
+  }
+  
+}
+
+#' @title Pull Expected Invites
+#' @description This function will create a list with all future invites for a specified timepoint, a graph and counts showing invites per month
+#' @param token Unique REDCap token ID - use screener token if looking at timepoints 4m and below
+#' @param timepoint 'prenatal', 'newborn', '4m', '8m', '12m'
+#' @param max_date Maximum date to cut off output - default is 'none'. Must be format of 'YYYY-MM-DD'
+#' @return A list with dataframe of all invites, bar chart, and dataframe with invite counts per month
+#' @export
+get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
+  age_in <- case_when(
+    timepoint == '4m' ~ 107,
+    timepoint == '8m' ~ 228,
+    timepoint == '12m' ~  350,
+    timepoint == 'newborn' ~ 7,
+    timepoint == 'prenatal' ~ -84
+  )
+  
+  #SCREENER PROJECT DEPENDENT - prenatal, peach, 4m
+  #ORCA PROJECT DEPENDENT - 8m, 12m
+  
+  if (timepoint == 'prenatal' | timepoint == 'newborn') {
+    screener_cohort <- get_orca_cohort(token, screener=T)
+    due_date <- get_orca_field(token, field='rec_due_date')
+    
+    data <- screener_cohort %>%
+      left_join(due_date, by='record_id') %>%
+      select(record_id, rec_due_date) %>%
+      filter(!is.na(rec_due_date)) 
+    
+    data <- data %>%
+      mutate(exp_invite_date = rec_due_date -84,
+             invite_month = format(exp_invite_date, "%b %y")) %>%
+      filter(exp_invite_date > Sys.Date())
+    
+  } else if (timepoint == 'newborn') {
+    screener_cohort <- get_orca_cohort(token, screener=T)
+    due_date <- get_orca_field(token, field='rec_due_date')
+    
+    prenatal <- screener_cohort %>%
+      left_join(due_date, by='record_id') %>%
+      select(record_id, rec_due_date) %>%
+      filter(!is.na(rec_due_date)) 
+    
+    prenatal <- prenatal %>%
+      mutate(exp_invite_date = rec_due_date + age_in) %>%
+      filter(exp_invite_date > Sys.Date())
+    
+    data <- get_orca_data(token, form='contact_log', form_complete = F) %>%
+      filter(orca_study_enrollment___5 == 1) %>%
+      select(record_id)
+    
+    data <- data %>%
+      left_join(prenatal, by="record_id")
+    data <- data %>%
+      mutate(invite_month = format(exp_invite_date, "%b %y"))
+    
+  } else if (timepoint == '4m') {
+    screener_cohort <- get_orca_cohort(token, screener=T)
+    child_dob <- get_screener_child_dob(token)
+    
+    child_dob <- child_dob %>%
+      select(record_id, final_dob)
+    
+    data <- screener_cohort %>%
+      left_join(child_dob, by='record_id') %>%
+      filter(orca == 1) %>%
+      select(record_id, final_dob)
+    
+    data$exp_invite_date = data$final_dob + 107
+    
+    data <- data %>%
+      filter(exp_invite_date > Sys.Date()) %>%
+      mutate(invite_month = format(exp_invite_date, "%b %y"))
+    
+  } else if (timepoint == '8m' | timepoint == '12m') {
+    orca_cohort <- get_orca_cohort(token) %>%
+      select(record_id)
+    
+    dob <- get_orca_field(token, field='child_dob') %>%
+      select(-redcap_event_name)
+    
+    data <- orca_cohort %>%
+      left_join(dob, by='record_id')
+    
+    data <- data %>%
+      mutate(exp_invite_date = child_dob + age_in,
+             invite_month = format(exp_invite_date, "%b %y")) %>%
+      select(-child_dob) %>%
+      filter(exp_invite_date > Sys.Date())
+    
+    
+  }
+  
+  if (max_date != 'none') {
+    max_date = as.Date(max_date, format='%Y-%m-%d')
+    
+    data <- data %>%
+      filter(exp_invite_date <= max_date)
+  }
+  #GRAPH 
+  data$invite_month <- factor(data$invite_month, levels = unique(data$invite_month))
+  
+  colors <- '#dabfff'
+  
+  
+  title = paste0("Future invites by month for ", timepoint, " timepoint")
+  
+  plot <- ggplot(data, aes(x = invite_month)) +
+    geom_bar(position = "stack", width = 0.8, fill='#dabfff', color='black') +
+    labs(title = title,
+         x = "Month-Year",
+         y = "Number of Invites") + 
+    theme(panel.background = element_rect(fill="white"),
+          panel.border=element_rect(color="#3C1939", fill=NA, linewidth=1),
+          legend.title = element_blank(), 
+          axis.text = element_text(family = 'Arial', size = 10),
+          axis.title = element_text(family='Arial', size=12),
+          legend.text = element_text(family='Arial', size=11),
+          title = element_text(family="Arial", size=14)) +
+    scale_fill_manual(values = colors)
+  plot
+  
+  
+  #creating data frame with counts per month 
+  counts <- data.frame(table(data$invite_month)) %>%
+    rename(total = Freq)
+  
+  counts <- counts %>%
+    rename(month = Var1)
+  
+  result <- list(data = data, plot = plot, counts = counts)
+  
+  return(result)
+  
 }
