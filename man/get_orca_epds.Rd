@@ -4,10 +4,14 @@
 \alias{get_orca_epds}
 \title{Process EPDS postpartum depression data}
 \usage{
-get_orca_epds(token, timepoint = "orca_4month_arm_1")
+get_orca_epds(token, timepoint = "orca_4month_arm_1", timestamp = T)
 }
 \arguments{
 \item{token}{Unique REDCap token ID}
+
+\item{timepoint}{REDCap event name (character) default is orca_4month_arm_1}
+
+\item{timestamp}{whether to include survey timestamp. Default is true}
 }
 \value{
 A data frame for the completed surveys

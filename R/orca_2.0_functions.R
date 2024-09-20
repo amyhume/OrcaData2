@@ -894,12 +894,20 @@ get_visit_n <- function(token, timepoint = 4) {
 #' @description This function will download and return the totalsummed scores for the EPDS. Only total scores, and not cutoff values, are returned.
 #'
 #' @param token Unique REDCap token ID
+#' @param timepoint REDCap event name (character) default is orca_4month_arm_1
+#' @param timestamp whether to include survey timestamp. Default is true
 #' @return A data frame for the completed surveys
 #' @export
-get_orca_epds <- function(token, timepoint = 'orca_4month_arm_1') {
+get_orca_epds <- function(token, timepoint = 'orca_4month_arm_1', timestamp=T) {
   epds = get_orca_data(token, "edinburgh_postnatal_depression_scale", form_complete = T)
   epds <- dplyr::filter(epds, redcap_event_name == timepoint)
-  epds = epds[,c("record_id", "epds_total", "epds_dep", "epds_anx")]
+  
+  if (timestamp) {
+    epds = epds[,c("record_id", "edinburgh_postnatal_depression_scale_timestamp", "epds_total", "epds_dep", "epds_anx")]
+  } else if (!timestamp) {
+    epds = epds[,c("record_id", "epds_total", "epds_dep", "epds_anx")]
+  }
+
   return (epds)
 }
 
@@ -909,12 +917,20 @@ get_orca_epds <- function(token, timepoint = 'orca_4month_arm_1') {
 #' @description This function will download and return the total scores for pss
 #'
 #' @param token Unique REDCap token ID
+#' @param timepoint REDCap event name (character) default is orca_4month_arm_1
+#' @param timestamp whether to include survey timestamp. Default is true
 #' @return A data frame for the completed surveys
 #' @export
-get_orca_pss <- function(token, timepoint = 'orca_4month_arm_1') {
+get_orca_pss <- function(token, timepoint = 'orca_4month_arm_1', timestamp=T) {
   pss <- get_orca_data(token, form = 'perceived_stress_scale', form_complete=T)
   pss <- dplyr::filter(pss, redcap_event_name == timepoint)
-  pss = pss[,c("record_id", "pss_date", "pss_score", "pss_14_score", 'pss_10_score_cutoff')]
+  
+  if (timestamp) {
+    pss = pss[,c("record_id", "pss_date", "pss_score", "pss_14_score", 'pss_10_score_cutoff')]
+  } else if (!timestamp) {
+    pss = pss[,c("record_id", "pss_score", "pss_14_score", 'pss_10_score_cutoff')]
+  }
+  
   return (pss)
 }
 
@@ -923,9 +939,11 @@ get_orca_pss <- function(token, timepoint = 'orca_4month_arm_1') {
 #' @description This function will download and return the total scores for pbq
 #'
 #' @param token Unique REDCap token ID
+#' @param timepoint REDCap event name (character) default is orca_4month_arm_1
+#' @param timestamp whether to include survey timestamp. Default is true
 #' @return A data frame for the completed surveys
 #' @export
-get_orca_pbq <- function(token, timepoint='orca_4month_arm_1') {
+get_orca_pbq <- function(token, timepoint='orca_4month_arm_1', timestamp=T) {
   library(dplyr)
   pbq <- get_orca_data(token, form='postpartum_bonding_questionnaire', form_complete = T)
   pbq <- dplyr::filter(pbq, redcap_event_name == timepoint)
@@ -945,8 +963,14 @@ get_orca_pbq <- function(token, timepoint='orca_4month_arm_1') {
            if_anxiety_cutoff = ifelse(if_anxiety >=10, 1, 0),
            inc_abuse_cutoff = ifelse(inc_abuse >= 3, 1,0))
   
-  pbq <- pbq %>%
-    select(record_id, postpartum_bonding_questionnaire_timestamp, impaired_bonding:inc_abuse_cutoff)
+  if (timestamp) {
+    pbq <- pbq %>%
+      select(record_id, postpartum_bonding_questionnaire_timestamp, impaired_bonding:inc_abuse_cutoff)
+  } else if (!timestamp) {
+    pbq <- pbq %>%
+      select(record_id, impaired_bonding:inc_abuse_cutoff)
+  }
+
   
   return(pbq)
 }
@@ -954,10 +978,14 @@ get_orca_pbq <- function(token, timepoint='orca_4month_arm_1') {
 #' @title Process IBQ Data
 #' @description This function will download and return the mean scores for the IBQ subscales (surgency, negative affect, effortful control).
 #' @param token Unique REDCap token ID
+#' @param timepoint REDCap event name (character) default is orca_4month_arm_1
+#' @param timestamp whether to include survey timestamp. Default is true
 #' @return A data frame for the completed surveys
 #' @export
-get_orca_ibq <- function(token) {
+get_orca_ibq <- function(token, timepoint = 'orca_4month_arm_1', timestamp=T) {
   ibq <- get_orca_data(token, form = 'infant_behavior_questionnaire_very_short_form')
+  ibq <- dplyr::filter(ibq, redcap_event_name == timepoint)
+  
   #reversing item 11
   ibq[ibq== 999] = NA
   ibq$ibq11r <- (8-ibq$ibq_11)
@@ -968,8 +996,13 @@ get_orca_ibq <- function(token) {
   ibq$ibq_ec <- rowMeans(ibq[, c("ibq_05", "ibq_06", "ibq11r", "ibq_12", "ibq_18", "ibq_19", "ibq_24", 
                                  "ibq_25", "ibq_30", "ibq_31", "ibq_34", "ibq_35")], na.rm = TRUE)
   
-  
-  ibq <- ibq[, c("record_id", "infant_behavior_questionnaire_very_short_form_timestamp", "ibq_sur", "ibq_neg", "ibq_ec")]
+  if (timestamp) {
+    ibq <- ibq[, c("record_id", "infant_behavior_questionnaire_very_short_form_timestamp", "ibq_sur", "ibq_neg", "ibq_ec")]
+    
+  } else if (!timestamp) {
+    ibq <- ibq[, c("record_id", "ibq_sur", "ibq_neg", "ibq_ec")]
+  }
+
   
   return(ibq)
 }
@@ -1010,9 +1043,10 @@ study_eligibility <- function(data) {
 #' @description This function will download and return the total scores for the quic 5
 #' @param token Unique REDCap token ID
 #' @param timepoint redcap event name for the timepoint you wish to pull
+#' @param timestamp whether to include survey timestamp. Default is true
 #' @return A data frame for the completed surveys
 #' @export
-get_quic5 <- function(token, timepoint = "orca_4month_arm_1") {
+get_quic5 <- function(token, timepoint = "orca_4month_arm_1", timestamp=T) {
   library(dplyr)
   quic5 = get_orca_data(token, "quic_5")
   quic5 = dplyr::filter(quic5, redcap_event_name == timepoint)
@@ -1021,7 +1055,11 @@ get_quic5 <- function(token, timepoint = "orca_4month_arm_1") {
   quic5$quic5_4r = 1 - quic5$quic5_4r
   quic5$quic5_all = quic5$quic5_1r + quic5$quic5_2 + quic5$quic5_3 + quic5$quic5_4r
   
-  quic5 = quic5[,c("record_id", "quic_5_timestamp","quic5_all")]
+  if (timestamp) {
+    quic5 = quic5[,c("record_id", "quic_5_timestamp","quic5_all")]
+  } else if (!timestamp) {
+    quic5 = quic5[,c("record_id","quic5_all")]
+  }
   return (quic5)
 }
 
@@ -1132,9 +1170,10 @@ get_trimester_n <- function(token, field = 'rec_due_date') {
 #' @description This function will download and return the total state and trait scores for the stai 5
 #' @param token Unique REDCap token ID
 #' @param timepoint redcap event name for the timepoint you wish to pull
+#' @param timestamp whether to include survey timestamp. Default is true
 #' @return A data frame for the completed surveys
 #' @export
-get_stai5 <- function(token, timepoint = "orca_4month_arm_1") {
+get_stai5 <- function(token, timepoint = "orca_4month_arm_1", timestamp=T) {
   library(dplyr)
   stai5 = get_orca_data(token, "state_trait_anxiety_inventory")
   stai5 = dplyr::filter(stai5, redcap_event_name == timepoint)
@@ -1144,7 +1183,12 @@ get_stai5 <- function(token, timepoint = "orca_4month_arm_1") {
   stai5$stait <- rowSums(stai5[, c("stait1", "stait2", "stait3", "stait4", "stait5")], na.rm = TRUE)
   stai5 <- stai5 %>% mutate(s_cutoff = ifelse(stais > 9.5, 1, 0), t_cutoff = ifelse(stait > 13.5, 1, 0))
   
-  stai5 <- stai5 %>% select("record_id", "state_trait_anxiety_inventory_timestamp","stais", "stait", "s_cutoff", "t_cutoff")
+  if (timestamp) {
+    stai5 = stai5[,c("record_id", "state_trait_anxiety_inventory_timestamp","stais", "stait", "s_cutoff", "t_cutoff")]
+  } else if (!timestamp) {
+    stai5 = stai5[,c("record_id","stais", "stait", "s_cutoff", "t_cutoff")]
+  }
+
   return(stai5)
 }
 
@@ -1152,9 +1196,10 @@ get_stai5 <- function(token, timepoint = "orca_4month_arm_1") {
 #' @description This function will download and return the total scores for each subscale of the DERS
 #' @param token Unique REDCap token ID
 #' @param timepoint redcap event name for the timepoint you wish to pull
+#' @param timestamp whether to include survey timestamp. Default is true
 #' @return A data frame for the completed surveys
 #' @export
-get_ders <- function(token, timepoint = "orca_4month_arm_1") {
+get_ders <- function(token, timepoint = "orca_4month_arm_1", timestamp=T) {
   library(dplyr)
   ders = get_orca_data(token, "difficulties_in_emotional_regulation_16")
   ders = dplyr::filter(ders, redcap_event_name == timepoint)
@@ -1166,7 +1211,13 @@ get_ders <- function(token, timepoint = "orca_4month_arm_1") {
   ders$impulse <- rowSums(ders[, c("ders_4", "ders_8", "ders_11")], na.rm = TRUE)
   ders$strategies <- rowSums(ders[, c("ders_5", "ders_6", "ders_12", "ders_14", "ders_16")], na.rm = TRUE)
   ders$nonacceptance <- rowSums(ders[, c("ders_9", "ders_10")], na.rm = TRUE)
-  ders <- ders %>% select("record_id", "difficulties_in_emotional_regulation_16_timestamp","total_score", "clarity", "goals", "impulse", "strategies", "nonacceptance")
+  
+  if (timestamp) {
+    ders = ders[,c("record_id", "difficulties_in_emotional_regulation_16_timestamp","total_score", "clarity", "goals", "impulse", "strategies", "nonacceptance")]
+  } else if (!timestamp) {
+    ders = ders[,c("record_id", "difficulties_in_emotional_regulation_16_timestamp","total_score", "clarity", "goals", "impulse", "strategies", "nonacceptance")]
+  }
+  
   return(ders)
 }
 

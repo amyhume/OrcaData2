@@ -4,10 +4,14 @@
 \alias{get_orca_ibq}
 \title{Process IBQ Data}
 \usage{
-get_orca_ibq(token)
+get_orca_ibq(token, timepoint = "orca_4month_arm_1", timestamp = T)
 }
 \arguments{
 \item{token}{Unique REDCap token ID}
+
+\item{timepoint}{REDCap event name (character) default is orca_4month_arm_1}
+
+\item{timestamp}{whether to include survey timestamp. Default is true}
 }
 \value{
 A data frame for the completed surveys
