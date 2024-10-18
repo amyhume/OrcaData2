@@ -489,57 +489,113 @@ zip_data <- function() {
 #' @export
 import_data <- function(token, data = data) {
   library(redcapAPI)
-  unique_events <- unique(data$redcap_event_name)
   
-  #pulling existing redcap data
-  all <- get_all_data(token)
-  all <- filter(all, redcap_event_name == unique_events)
-  all <- all[, colnames(all) %in% colnames(data)]
-  
-  columns <- colnames(all)[!str_detect(colnames(all), 'record_id') & !str_detect(colnames(all), 'redcap_event_name')]
-  
-  test <- all %>%
-    right_join(data, by=c('record_id', 'redcap_event_name'))
-  
-  #checking columns with conflicts
-  conflicts_for <- as.character()
-  
-  for (column in columns) {
-    column_data <- dplyr::select(test, record_id, redcap_event_name, paste0(column, '.x'), paste0(column, '.y'))
-    column_data <- dplyr::filter(column_data, !is.na(column_data[3]) & !is.na(column_data[4]))
+  if ('redcap_event_name' %in% colnames(data)) {
+    unique_events <- unique(data$redcap_event_name)
     
-    #prints rows with conflicts that will be overwritten
-    if (nrow(column_data) >= 1) {
-      print(paste0('conflict found for field: ', column))
-      print.data.frame(column_data)
-      cat("\n")
-      conflicts_for <- c(conflicts_for, column)
+    unique_events <- unique(data$redcap_event_name)
+    
+    #pulling existing redcap data
+    all <- get_all_data(token)
+    all <- filter(all, redcap_event_name == unique_events)
+    all <- all[, colnames(all) %in% colnames(data)]
+    
+    columns <- colnames(all)[!str_detect(colnames(all), 'record_id') & !str_detect(colnames(all), 'redcap_event_name')]
+    
+    test <- all %>%
+      right_join(data, by=c('record_id', 'redcap_event_name'))
+    
+    #checking columns with conflicts
+    conflicts_for <- as.character()
+    
+    for (column in columns) {
+      column_data <- dplyr::select(test, record_id, redcap_event_name, paste0(column, '.x'), paste0(column, '.y'))
+      column_data <- dplyr::filter(column_data, !is.na(column_data[3]) & !is.na(column_data[4]))
+      
+      #prints rows with conflicts that will be overwritten
+      if (nrow(column_data) >= 1) {
+        print(paste0('conflict found for field: ', column))
+        print.data.frame(column_data)
+        cat("\n")
+        conflicts_for <- c(conflicts_for, column)
+      }
+      
     }
     
-  }
-  
-  #ask user to check above conflicts and respond 'y'/'n' to import
-  if (length(conflicts_for) >= 1) {
-    cat("Check the datasets above carefully. columns x represent the existing data contents, column y represents the data that will overwrite\n",
-        "If column x contains data, this import will OVERWRITE that existing data\n",
-        "If the cell contents are the same, there is no new data to import")
-  } else {
-    print('no conflicts found. No datasets will be overwritten')
+    #ask user to check above conflicts and respond 'y'/'n' to import
+    if (length(conflicts_for) >= 1) {
+      cat("Check the datasets above carefully. columns x represent the existing data contents, column y represents the data that will overwrite\n",
+          "If column x contains data, this import will OVERWRITE that existing data\n",
+          "If the cell contents are the same, there is no new data to import")
+    } else {
+      print('no conflicts found. No datasets will be overwritten')
+      
+      print(data) ; cat("check the import data carefully")
+    }
     
-    print(data) ; cat("check the import data carefully")
-  }
-
-
-  response <- readline(prompt = "Do you want to continue? (y/n): ")
-  
-  #data import if participant responds y
-  if (tolower(response) == 'y') {
-    conn <- redcapConnection(url = url, token = token)
-    import_status <- importRecords(conn, data = data)
-    print(paste0("Data import completed for ", import_status, " records"))
+    
+    response <- readline(prompt = "Do you want to continue? (y/n): ")
+    
+    #data import if participant responds y
+    if (tolower(response) == 'y') {
+      conn <- redcapConnection(url = url, token = token)
+      import_status <- importRecords(conn, data = data)
+      print(paste0("Data import completed for ", import_status, " records"))
+    } else {
+      print("Data import terminated.")
+    }
   } else {
-    print("Data import terminated.")
+    #pulling existing redcap data
+    all <- get_all_data(token)
+    all <- all[, colnames(all) %in% colnames(data)]
+    
+    columns <- colnames(all)[!str_detect(colnames(all), 'record_id')]
+    
+    test <- all %>%
+      right_join(data, by=c('record_id'))
+    
+    #checking columns with conflicts
+    conflicts_for <- as.character()
+    
+    for (column in columns) {
+      column_data <- dplyr::select(test, record_id, paste0(column, '.x'), paste0(column, '.y'))
+      column_data <- dplyr::filter(column_data, !is.na(column_data[2]) & !is.na(column_data[2]))
+      
+      #prints rows with conflicts that will be overwritten
+      if (nrow(column_data) >= 1) {
+        print(paste0('conflict found for field: ', column))
+        print.data.frame(column_data)
+        cat("\n")
+        conflicts_for <- c(conflicts_for, column)
+      }
+      
+    }
+    
+    #ask user to check above conflicts and respond 'y'/'n' to import
+    if (length(conflicts_for) >= 1) {
+      cat("Check the datasets above carefully. columns x represent the existing data contents, column y represents the data that will overwrite\n",
+          "If column x contains data, this import will OVERWRITE that existing data\n",
+          "If the cell contents are the same, there is no new data to import")
+    } else {
+      print('no conflicts found. No datasets will be overwritten')
+      
+      print(data) ; cat("check the import data carefully")
+    }
+    
+    
+    response <- readline(prompt = "Do you want to continue? (y/n): ")
+    
+    #data import if participant responds y
+    if (tolower(response) == 'y') {
+      conn <- redcapConnection(url = url, token = token)
+      import_status <- importRecords(conn, data = data)
+      print(paste0("Data import completed for ", import_status, " records"))
+    } else {
+      print("Data import terminated.")
+    }
   }
+  
+  
 }
 
 
