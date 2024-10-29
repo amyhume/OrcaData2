@@ -931,10 +931,15 @@ get_visit_n <- function(token, timepoint = 4) {
   
   if (timepoint == 4) {
     data <- get_orca_field(token, field="visit_date_4m")
+    data <- data %>%
+      filter(!str_detect(record_id, 'P') & !str_detect(record_id, 'p'))
+    
     n <- nrow(data)
     return(n)
   } else if (timepoint == 8){
     data <- get_orca_field(token, field="visit_date_8m")
+    data <- data %>%
+      filter(!str_detect(record_id, 'P') & !str_detect(record_id, 'p'))
     n <- nrow(data)
     return(n)
   } else {
