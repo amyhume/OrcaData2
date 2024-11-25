@@ -628,11 +628,13 @@ get_all_data <- function(token) {
   )
   response <- httr::POST(url, body = formData, encode = "form")
   result <- httr::content(response)
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "test"))
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "IRB"))
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "D"))
-  df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
+  result <- dplyr::filter(result, !stringr::str_detect(record_id, "TEST"))
+  result <- dplyr::filter(result, !stringr::str_detect(record_id, "test"))
+  result <- dplyr::filter(result, !stringr::str_detect(record_id, "IRB"))
+  result <- dplyr::filter(result, !stringr::str_detect(record_id, "D"))
+  result <- dplyr::filter(result, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
+  
+  
   return(result)
 }
 
