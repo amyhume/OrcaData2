@@ -36,6 +36,10 @@ get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_
   df <- httr::content(response)
   if (nrow(df) >= 1) {
     df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
+    df <- dplyr::filter(df, !stringr::str_detect(record_id, "test"))
+    df <- dplyr::filter(df, !stringr::str_detect(record_id, "IRB"))
+    df <- dplyr::filter(df, !stringr::str_detect(record_id, "D"))
+    df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
   } else {
     print('no data returned - may need to set form_complete = F')
   }
@@ -76,6 +80,10 @@ get_orca_field <- function(token = token, field=field, raw_v_label = 'raw') {
   df <- dplyr::select(df, record_id, redcap_event_name, all_of(field))
   df <- df[!is.na(df[[field]]),]
   df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
+  df <- dplyr::filter(df, !stringr::str_detect(record_id, "test"))
+  df <- dplyr::filter(df, !stringr::str_detect(record_id, "IRB"))
+  df <- dplyr::filter(df, !stringr::str_detect(record_id, "D"))
+  df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
   return (df)
 }
 
@@ -620,6 +628,11 @@ get_all_data <- function(token) {
   )
   response <- httr::POST(url, body = formData, encode = "form")
   result <- httr::content(response)
+  df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
+  df <- dplyr::filter(df, !stringr::str_detect(record_id, "test"))
+  df <- dplyr::filter(df, !stringr::str_detect(record_id, "IRB"))
+  df <- dplyr::filter(df, !stringr::str_detect(record_id, "D"))
+  df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
   return(result)
 }
 
@@ -1173,6 +1186,7 @@ assign_ids <- function(existing_ids, new_participants, prefix, digits=3) {
   }
   
   new_ids = as.numeric()
+  
   if (length(missing_numbers) >= 1) {
     new_ids <- missing_numbers
   }
@@ -1181,10 +1195,13 @@ assign_ids <- function(existing_ids, new_participants, prefix, digits=3) {
   next_id = max(existing_ids) + 1
   new_id = next_id
   
-  for (x in start_n:length(new_participants)) {
-    new_ids <- c(new_ids, new_id)
-    new_id <- new_id + 1
+  if (length(new_participants) > length(new_ids)) {
+    for (x in start_n:length(new_participants)) {
+      new_ids <- c(new_ids, new_id)
+      new_id <- new_id + 1
+    }
   }
+  
   
   digits = paste0("%0", digits, "d")
   new_ids <- paste0(prefix, sprintf(digits, new_ids))
