@@ -1148,10 +1148,29 @@ get_missing_ids <- function(token) {
   library(dplyr)
   all_ids <- get_all_data(token)
   
+  ids_4m <- all_ids %>%
+    filter(redcap_event_name == 'orca_4month_arm_1' & !str_detect(tolower(record_id), 'p'))
+  
+  ids_4m <- ids_4m %>%
+    select(record_id, pre_visit_date_4m, visit_scheduled_4m, visit_date_4m)
+  
+  flagged_ids <- as.character()
+  
+  for (row in 1:nrow(ids_4m)) {
+    if(!is.na(ids_4m$pre_visit_date_4m[row])) {
+      time_since_pre <- as.numeric(difftime(Sys.Date(), ids_4m$pre_visit_date_4m[row], units='days'))
+      
+      if (time_since_pre >= 21 & is.na(ids_4m$visit_date_4m[row])) {
+        flagged_ids <- c(flagged_ids, ids_4m$record_id[row])
+      }
+    }
+  }
+  
   all_ids <- all_ids %>%
     distinct(record_id,.keep_all = T) %>%
+    filter(redcap_event_name == 'orca_participant_m_arm_1') %>%
     select(record_id) %>%
-    filter(!str_detect(tolower(record_id), 'test') & !str_detect(tolower(record_id), 'p'))
+    filter(!str_detect(tolower(record_id), 'p'))
   
   x <- min(all_ids$record_id):max(all_ids$record_id)
   
@@ -1164,8 +1183,13 @@ get_missing_ids <- function(token) {
     }
   }
   
+  if (length(flagged_ids) > 0) {
+    cat('Check whether the following ids can be reassigned: ', '\n',
+        flagged_ids)
+  }
   return(missing_ids)
 }
+
 
 #' @title Assign New Ids
 #' @description this function will take existing ids and create new ones for new participants. It will fill missing ids.
