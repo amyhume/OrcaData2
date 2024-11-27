@@ -1575,3 +1575,30 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
   return(result)
   
 }
+
+
+#' Generates REDCap Survey Data
+#'
+#' Returns a data frame with contact info, completion status, access codes etc. for every ID for a given survey
+#'
+#' @param token Unique REDCap token ID
+#' @param form Name of the survey to be downloaded
+#' @param event Event name e.g. prenatal_surveys_arm_1
+#' @return Data frame with record_ids and survey information for particular form
+#' @export
+#'
+get_survey_data <- function(token, form=form, event=event) {
+  
+  formData <- list("token" = token,
+                   content='participantList',
+                   format = 'csv',
+                   instrument = form,
+                   event = event,
+                   returnFormat='csv')
+  response <- httr::POST(url, body = formData, encode="form")
+  df <- httr::content(response)
+  df <- dplyr::filter(df, !is.na(record))
+  df <- dplyr::rename(df, record_id = record)
+  df <- dplyr::select(df, record_id, email, invitation_sent_status:survey_queue_link)
+  return(df)
+}
