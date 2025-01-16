@@ -1098,9 +1098,7 @@ study_eligibility <- function(data) {
     data <- data %>%
       mutate(orca_study_enrollment = case_when(
         current_age > 137 & current_age <= 304 ~ 'ORCA 1.0',
-        current_age >= 60 & current_age <= 137 ~ 'MICE BL',
-        current_age < 60 & current_age > 0 ~ 'ORCA 2.0',
-        current_age < 91 & priority == 'Low Priority' ~ 'ORCA 2.0',
+        current_age >= 1 & current_age <= 137 ~ 'MICE BL',
         pregnant_yesno == 1 & priority == 'High Priority' ~ 'ORCA 2.0',
         pregnant_yesno == 1 & priority == 'Low Priority' ~ 'MICE',
         pregnant_yesno == 0 & current_age > 304 ~ 'ineligible_age'
@@ -1201,6 +1199,7 @@ get_missing_ids <- function(token) {
 #' @export
 assign_ids <- function(existing_ids, new_participants, prefix, digits=3) {
   existing_ids <- as.numeric(gsub(prefix, '', existing_ids))
+  existing_ids <- as.vector(na.omit(existing_ids))
   
   #checking for missing ids
   if (length(existing_ids) >= 1) {
