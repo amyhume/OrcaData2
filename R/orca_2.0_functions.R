@@ -957,8 +957,12 @@ get_visit_n <- function(token, timepoint = 4) {
       filter(!str_detect(record_id, 'P') & !str_detect(record_id, 'p'))
     n <- nrow(data)
     return(n)
-  } else {
-    print('no visit data available yet for any timepoints other than 4m and 8m. Enter timepoint = 4 or 8 to see')
+  } else if (timepoint == 12) {
+    data <- get_orca_field(token, field="visit_date_12m")
+    data <- data %>%
+      filter(!str_detect(record_id, 'P') & !str_detect(record_id, 'p'))
+    n <- nrow(data)
+    return(n)
   }
   
 }
@@ -1600,4 +1604,70 @@ get_survey_data <- function(token, form=form, event=event) {
   df <- dplyr::rename(df, record_id = record)
   df <- dplyr::select(df, record_id, email, invitation_sent_status:survey_queue_link)
   return(df)
+}
+
+#' This function returns a dataframe with infant dob, date, and age for a specified event
+#'
+#' @param token Unique REDCap token ID
+#' @param timepoint redcap_event_name for the timepoint you wish to pull
+#' @return dataframe with visit data for that timepoint
+#' @export
+get_visit_data <- function(token, timepoint = 4) {
+  
+  dobs <- get_orca_field(token, field='child_dob') %>%
+    select(-redcap_event_name)
+  
+  if (timepoint == 4) {
+    data <- get_orca_data(token, form="visit_notes_4m", form_complete = F)
+    data <- data %>%
+      filter(!str_detect(record_id, 'P') & !str_detect(record_id, 'p')) %>%
+      filter(redcap_event_name == 'orca_4month_arm_1' & !is.na(visit_date_4m))
+    
+    data <- data %>%
+      left_join(dobs, by='record_id') %>%
+      select(record_id, child_dob, visit_date_4m, child_age_4m)
+    return(data)
+  } else if (timepoint == 8){
+    data <- get_orca_data(token, form="visit_notes_8m", form_complete = F)
+    data <- data %>%
+      filter(!str_detect(record_id, 'P') & !str_detect(record_id, 'p')) %>%
+      filter(redcap_event_name == 'orca_8month_arm_1' & !is.na(visit_date_8m))
+    
+    data <- data %>%
+      left_join(dobs, by='record_id') %>%
+      select(record_id, child_dob, visit_date_8m, child_age_8m)
+    return(data)
+  } else if (timepoint == 12) {
+    data <- get_orca_data(token, form="visit_notes_12m", form_complete = F)
+    data <- data %>%
+      filter(!str_detect(record_id, 'P') & !str_detect(record_id, 'p')) %>%
+      filter(redcap_event_name == 'orca_12month_arm_1' & !is.na(visit_date_12m))
+    
+    data <- data %>%
+      left_join(dobs, by='record_id') %>%
+      select(record_id, child_dob, visit_date_12m, child_age_12m)
+    return(data)
+  }
+}
+
+#' Provides timepoint completion info for every timepoint
+#'
+#' @param token Unique REDCap token ID
+#' @return dataframe with each ID, and a column for each timepoint with date of completion
+#' @export
+get_all_timepoints <- function(token) {
+  date4 <- get_orca_field(token, field='visit_date_4m')
+  date8 <- get_orca_field(token, field='visit_date_8m')
+  date12 <- get_orca_field(token, field = "visit_date_12m")
+  
+  dates <- date4 %>%
+    full_join(date8, by='record_id') %>%
+    full_join(date12, by='record_id')
+  
+  dates <- dates %>%
+    select(record_id, visit_date_4m, visit_date_8m, visit_date_12m) %>%
+    filter(!str_detect(record_id, 'P') & !str_detect(record_id,'p'))
+  
+  return(dates)
+  
 }
