@@ -1671,3 +1671,144 @@ get_all_timepoints <- function(token) {
   return(dates)
   
 }
+
+
+#' Provides timepoint completion info for every timepoint
+#'
+#' @param token Unique REDCap token ID
+#' @return A list with tracker (a df with every kit that needs to be shipped, and the date it needs to be shipped by) and counts (number of kits to be shipped each day)
+#' @export
+get_shipping_timetable <- function(token) {
+  library(tidyverse)
+  kits_4m <- get_orca_report(token, report_code = '2666')
+  kits_8m <- get_orca_report(token, report_code = '3240')
+  kits_12m <- get_orca_report(token, report_code='3823')
+  
+  
+  #4m
+  kits_4m <- kits_4m %>%
+    mutate(shipby_date = as.Date(rep(NA, nrow(kits_4m))))
+  
+  for (x in 1:nrow(kits_4m)) {
+    if(!is.na(kits_4m$est_shipping_time[x])) {
+      shipby_date = kits_4m$visit_scheduled_date_4m[x] - (kits_4m$est_shipping_time[x] + 1)
+      
+    } else{
+      shipby_date = kits_4m$visit_scheduled_date_4m[x] - 8
+    }
+    
+    
+    
+    if (!is.na(shipby_date)) {
+      
+      shipby_day = as.character(wday(shipby_date, label=T))
+      days_between = seq(shipby_date, kits_4m$visit_scheduled_date_4m[x], by='day')
+      days_between = as.character(wday(days_between, label=TRUE))
+      
+      if (shipby_day == 'Sun') {
+        shipby_date = shipby_date - 2
+      } else if ('Sun' %in% days_between | shipby_day == 'Sat') {
+        shipby_date = shipby_date - 1
+      }
+      
+      kits_4m$shipby_date[x] = shipby_date
+    }
+    
+  }
+  
+  kits_8m <- kits_8m %>%
+    mutate(shipby_date = as.Date(rep(NA, nrow(kits_8m))))
+  
+  for (x in 1:nrow(kits_8m)) {
+    if(!is.na(kits_8m$est_shipping_time[x])) {
+      shipby_date = kits_8m$visit_scheduled_date_8m[x] - (kits_8m$est_shipping_time[x] + 1)
+    } else {
+      shipby_date = kits_8m$visit_scheduled_date_8m[x] - 8
+    }
+    
+    if (!is.na(shipby_date)) {
+      
+      shipby_day = as.character(wday(shipby_date, label=T))
+      days_between = seq(shipby_date, kits_8m$visit_scheduled_date_8m[x], by='day')
+      days_between = as.character(wday(days_between, label=TRUE))
+      
+      if (shipby_day == 'Sun') {
+        shipby_date = shipby_date - 2
+      } else if ('Sun' %in% days_between | shipby_day == 'Sat') {
+        shipby_date = shipby_date - 1
+      }
+      
+      kits_8m$shipby_date[x] = shipby_date
+    }
+    
+  }
+  
+  kits_12m <- kits_12m %>%
+    mutate(shipby_date = as.Date(rep(NA, nrow(kits_12m))))
+  
+  for (x in 1:nrow(kits_12m)) {
+    
+    if(!is.na(kits_12m$est_shipping_time[x])) {
+      shipby_date = kits_12m$visit_scheduled_date_12m[x] - (kits_12m$est_shipping_time[x] + 1)
+    } else {
+      shipby_date = kits_12m$visit_scheduled_date_12m[x] - 8
+    }
+    
+    if (!is.na(shipby_date)) {
+      
+      shipby_day = as.character(wday(shipby_date, label=T))
+      days_between = seq(shipby_date, kits_12m$visit_scheduled_date_12m[x], by='day')
+      days_between = as.character(wday(days_between, label=TRUE))
+      
+      if (shipby_day == 'Sun') {
+        shipby_date = shipby_date - 2
+      } else if ('Sun' %in% days_between | shipby_day == 'Sat') {
+        shipby_date = shipby_date - 1
+      }
+      
+      kits_12m$shipby_date[x] = shipby_date
+    } 
+    
+  }
+  
+  kits_4m <- kits_4m %>%
+    select(record_id, redcap_event_name, visit_scheduled_date_4m, est_shipping_time, shipby_date, visit_scheduled_exp_4m) %>%
+    rename(visit_scheduled_date = visit_scheduled_date_4m, exp = visit_scheduled_exp_4m)
+  
+  kits_8m <- kits_8m %>%
+    select(record_id, redcap_event_name, visit_scheduled_date_8m, est_shipping_time, shipby_date, visit_scheduled_exp_8m) %>%
+    rename(visit_scheduled_date = visit_scheduled_date_8m, exp = visit_scheduled_exp_8m)
+  
+  kits_12m <- kits_12m %>%
+    select(record_id, redcap_event_name, visit_scheduled_date_12m, est_shipping_time, shipby_date, visit_scheduled_exp_12m) %>%
+    rename(visit_scheduled_date = visit_scheduled_date_12m, exp = visit_scheduled_exp_12m)
+  
+  shipping_tracker <- kits_4m %>%
+    full_join(kits_8m) %>%
+    full_join(kits_12m)
+  
+  shipping_tracker <- shipping_tracker %>%
+    arrange(shipby_date) 
+  
+  counts = data.frame(table(shipping_tracker$shipby_date)) %>%
+    rename(date = Var1, freq = Freq)
+  
+  x <- list(tracker=shipping_tracker, counts=counts)
+  return(x)
+}
+
+get_orca_report <- function(token, report_code, raw_or_label = 'raw', checkbox_label = 'false') {
+  formData <- list("token"=token,
+                   content='report',
+                   format='csv',
+                   report_id=as.character(report_code),
+                   csvDelimiter='',
+                   rawOrLabel=raw_or_label,
+                   rawOrLabelHeaders='raw',
+                   exportCheckboxLabel=checkbox_label,
+                   returnFormat='json'
+  )
+  response <- httr::POST(url, body = formData, encode = "form")
+  result <- httr::content(response)
+  
+}
