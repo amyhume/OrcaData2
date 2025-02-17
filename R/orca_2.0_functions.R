@@ -1797,6 +1797,14 @@ get_shipping_timetable <- function(token) {
   return(x)
 }
 
+#' Pulling a redcap report
+#'
+#' @param token The API token for the project
+#' @param report_code the character report code for the report you wish to pull
+#' @param raw_v_label The label for raw data fields
+#' @param checkbox_label whether to combine checkbox fields
+#' @return A dataframe with the report 
+#' @export
 get_orca_report <- function(token, report_code, raw_or_label = 'raw', checkbox_label = 'false') {
   formData <- list("token"=token,
                    content='report',
