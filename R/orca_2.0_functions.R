@@ -1397,11 +1397,12 @@ get_orca_cohort <- function(token, screener=F) {
     #visit date info
     date_4m <- get_orca_field(token, field='visit_date_4m')
     date_8m <- get_orca_field(token, field='visit_date_8m')
+    date_12m <- get_orca_field(token, field='visit_date_12m')
     #date_12m <- get_orca_field(token, field='visit_date_12m')
     
     visit_dates <- date_4m %>%
-      left_join(date_8m, by='record_id') #%>%
-    #left_join(date_12m)
+      left_join(date_8m, by='record_id') %>%
+      left_join(date_12m)
     
     cols <- colnames(visit_dates)[!str_detect(colnames(visit_dates), 'redcap_event_name')]
     visit_dates <- visit_dates[, cols]
