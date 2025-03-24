@@ -1821,3 +1821,81 @@ get_orca_report <- function(token, report_code, raw_or_label = 'raw', checkbox_l
   result <- httr::content(response)
   
 }
+
+
+#' @title Process DERS Data
+#' @description This function will download and return the sum scores for the DIERS-16
+#' @param token Unique REDCap token ID
+#' @param timepoint REDCap event name (character) default is orca_4month_arm_1
+#' @param timestamp whether to include survey timestamp. Default is true
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_ders <- function(token, timepoint = 'orca_4month_arm_1', timestamp=T) {
+  library(tidyverse)
+  ders <- get_orca_data(token, form = 'difficulties_in_emotional_regulation_16')
+  ders <- ders %>%
+    filter(redcap_event_name == timepoint)
+  
+  ders$non_accept <- rowSums(ders[, c('ders_9', 'ders_10', 'ders_13')], na.rm=T)
+  ders$goals <- rowSums(ders[, c('ders_3', 'ders_7', 'ders_15')], na.rm=T)
+  ders$impulse <- rowSums(ders[, c('ders_4', 'ders_8', 'ders_11')], na.rm=T)
+  ders$strategies <- rowSums(ders[, c('ders_5', 'ders_6', 'ders_12', 'ders_14', 'ders_16')], na.rm=T)
+  ders$clarity <- rowSums(ders[, c('ders_1', 'ders_2')], na.rm=T)
+  
+  if (timestamp) {
+    ders = ders[,c("record_id", "difficulties_in_emotional_regulation_16_timestamp", 'non_accept', 'goals', 'impulse', 'strategies', 'clarity')]
+  } else if (!timestamp) {
+    ders = ders[,c("record_id", 'non_accept', 'goals', 'impulse', 'strategies', 'clarity')]
+  }
+  
+  return(ders)
+}
+
+#' @title Process BITSEA Data
+#' @description This function will download and return the sum scores for the bitsea subscales
+#' @param token Unique REDCap token ID
+#' @param timestamp whether to include survey timestamp. Default is true
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_bitsea <- function(token, timestamp=T) {
+  library(stringr)
+  bitsea = get_orca_data(token, "brief_infant_toddler_social_and_emotional_assessme")
+  bitsea$record_id = str_remove(bitsea$record_id, "^0+")
+  bitsea[bitsea == -888] = NA
+  bitsea[bitsea == 999] = NA
+  
+  bitsea$autism_competence  = rowSums(bitsea[,c("bitsea_1", "bitsea_10", "bitsea_13", "bitsea_15",
+                                                "bitsea_22", "bitsea_25", "bitsea_29", "bitsea_31")], na.rm=T)
+  bitsea$autism_problems = rowSums(bitsea[,c("bitsea_9", "bitsea_14", "bitsea_21", "bitsea_35",
+                                             "bitsea_36", "bitsea_37", "bitsea_38", "bitsea_39",
+                                             "bitsea_40")], na.rm=T)
+  bitsea$autism_total = bitsea$autism_problems - bitsea$autism_competence
+  bitsea$problems = rowSums(bitsea[,c("bitsea_2", "bitsea_3", "bitsea_4", "bitsea_6", "bitsea_7", "bitsea_8",
+                                      "bitsea_9", "bitsea_11", "bitsea_12", "bitsea_14", "bitsea_16", "bitsea_17",
+                                      "bitsea_18", "bitsea_21", "bitsea_23", "bitsea_24", "bitsea_26", "bitsea_27",
+                                      "bitsea_28", "bitsea_30", "bitsea_32", "bitsea_33", "bitsea_34", "bitsea_35",
+                                      "bitsea_36", "bitsea_37", "bitsea_38", "bitsea_39", "bitsea_40",
+                                      "bitsea_41", "bitsea_42")], na.rm=T)
+  bitsea$competence = rowSums(bitsea[,c("bitsea_1", "bitsea_5", "bitsea_10", "bitsea_13", "bitsea_15",
+                                        "bitsea_19", "bitsea_20", "bitsea_22", "bitsea_25", "bitsea_29", "bitsea_31")], na.rm=T)
+  
+  if (timestamp) {
+    bitsea = bitsea[,c("record_id", "brief_infant_toddler_social_and_emotional_assessme_timestamp","autism_competence", "autism_problems", "autism_total", "competence", "problems")]
+  } else if (!timestamp) {
+    bitsea = bitsea[,c("record_id","autism_competence", "autism_problems", "autism_total", "competence", "problems")]
+  }
+  bitsea$problem_thres = 0
+  bitsea[bitsea$problems > 11,"problem_thres"] = 1
+  bitsea$competence_thres = 0
+  bitsea[bitsea$competence < 13,"competence_thres"] = 1
+  bitsea$autism_total_thresh = 0
+  bitsea[bitsea$autism_total > 7,"autism_total_thresh"] = 1
+  bitsea$autism_comp_thresh = 0
+  bitsea[bitsea$competence < 12,"autism_comp_thresh"] = 1
+  bitsea$autism_prob_thresh = 0
+  bitsea[bitsea$autism_problems > 4,"autism_prob_thresh"] = 1
+  
+  
+  return(bitsea)
+  
+}
