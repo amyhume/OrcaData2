@@ -1388,7 +1388,8 @@ get_orca_cohort <- function(token, screener=F) {
     
     records <- records %>%
       filter(optout_yesno == 0 | is.na(optout_yesno)) %>%
-      filter(longitudinal_yesno != 0 & !is.na(longitudinal_yesno))
+      filter(longitudinal_yesno != 0 & !is.na(longitudinal_yesno)) %>%
+      filter(!str_detect(record_id, 'P'))
     
     records <- records %>%
       select(record_id)
@@ -1409,6 +1410,7 @@ get_orca_cohort <- function(token, screener=F) {
     
     records <- records %>%
       left_join(visit_dates, by='record_id')
+    
     
     return(records)
     
