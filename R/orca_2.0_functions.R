@@ -1131,7 +1131,7 @@ get_quic5 <- function(token, timepoint = "orca_4month_arm_1", timestamp=T) {
   
   quic5$quic5_1r = 1 - quic5$quic5_1r
   quic5$quic5_4r = 1 - quic5$quic5_4r
-  quic5$quic5_all = quic5$quic5_1r + quic5$quic5_2 + quic5$quic5_3 + quic5$quic5_4r
+  quic5$quic5_all = quic5$quic5_1r + quic5$quic5_2 + quic5$quic5_3 + quic5$quic5_4r + quic5$quic5_5
   
   if (timestamp) {
     quic5 = quic5[,c("record_id", "quic_5_timestamp","quic5_all")]
