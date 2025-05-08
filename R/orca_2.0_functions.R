@@ -1901,3 +1901,40 @@ get_orca_bitsea <- function(token, timestamp=T) {
   return(bitsea)
   
 }
+
+#' @title Pulling DOBs For Prenatal Participants
+#' @description This function pulls all possible due date/dob update variables and returns most up to date
+#' @param token Unique REDCap token ID
+#' @return A data frame with final dob and whether this is confirmed after birth or is just the due date
+#' @export
+get_prenatal_dob <- function(token) {
+  library(dplyr)
+  
+  dd <- get_orca_field(token, field='rec_due_date') %>%
+    select(-redcap_event_name)
+  bu1 <- get_orca_field(token, field='child_dob_update')%>%
+    select(-redcap_event_name)
+  bu2 <- get_orca_field(token, field='child_dob_update_fup')%>%
+    select(-redcap_event_name)
+  
+  
+  dobs <- dd %>%
+    full_join(bu1) %>%
+    full_join(bu2)
+  
+  dobs <- dobs %>%
+    distinct(record_id, .keep_all = T)
+  
+  dobs <- dobs %>%
+    mutate(child_dob_final = ifelse(!is.na(child_dob_update), child_dob_update,
+                                    ifelse(is.na(child_dob_update) & !is.na(child_dob_update_fup), child_dob_update_fup,
+                                           ifelse(is.na(child_dob_update) & is.na(child_dob_update_fup), rec_due_date, NA)))) %>%
+    mutate(dob_confirmed = ifelse(!is.na(child_dob_update) | !is.na(child_dob_update_fup), 1, 0))
+  
+  dobs$child_dob_final <- as.Date(dobs$child_dob_final, origin='1970-01-01')
+  
+  dobs <- dobs %>%
+    select(record_id, child_dob_final, dob_confirmed)
+  
+  return(dobs)
+}
