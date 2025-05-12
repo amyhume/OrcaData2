@@ -1938,3 +1938,55 @@ get_prenatal_dob <- function(token) {
   
   return(dobs)
 }
+
+#' @title Importing MICE participant to 4m project
+#' @description Pulls screener data for a mice id, reformats and imports it to the ORCA 2.0 redcap project
+#' @param scr_token Unique REDCap token ID for the New ORCA Recruitment Screener project
+#' @param orca_token Unique REDCap token ID for the ORCA 2.0 project
+#' @param mice_record_id String variable for the MICE id e.g. 'mc_018'
+#' @return User input for approval to import (respond y)
+#' @export
+import_mice_to_orca <- function(scr_token, orca_token, mice_record_id) {
+  mice_ids <- get_orca_field(token, field='mice_id')
+  
+  mice_ids <- mice_ids %>%
+    filter(mice_id == mice_record_id)
+  
+  sri = mice_ids$record_id[1]
+  
+  prenatal_surveys = get_orca_field(token, field='prams_complete') %>%
+    filter(record_id == sri)
+  
+  pch_complete = get_orca_field(token, field='pch_enroll_complete') %>%
+    filter(record_id == sri)
+  
+  blood_returned = get_orca_field(token, field='mice_returned') %>%
+    filter(record_id == sri)
+  
+  mc_consent <- get_orca_field(token, field='mice_consent_date') %>%
+    filter(record_id == sri)
+  
+  prenatal <- ifelse(nrow(prenatal_surveys) == 1 & prenatal_surveys$prams_complete[1] == 2, 1, 0)
+  blood <- as.Date(ifelse(nrow(blood_returned) == 1, blood_returned$mice_returned[1], NA))
+  blood_valid <- ifelse(as.Date(mc_consent$mice_consent_date[1]) >= as.Date('2024-11-01'), 1, 0)
+  
+  import_file <- data.frame(record_id = mice_record_id,
+                            redcap_event_name = 'mice_participant_m_arm_4',
+                            screener_record_id = sri,
+                            prenatal_yesno = prenatal,
+                            mc_blood_date = blood,
+                            mc_blood_valid = blood_valid)
+  
+  if (nrow(pch_complete) == 1) {
+    peach_pp <- get_orca_field(token='B17171C96E09FE75231D605CBCE4B249', field='screener_record_id')
+    peach_pp <- peach_pp %>%
+      filter(screener_record_id == sri)
+    
+    pch_id = peach_pp$record_id[1]
+    
+    import_file$pch_id = pch_id
+    
+  }
+  
+  import_data(orca_token, import_file)
+}
