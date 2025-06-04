@@ -239,90 +239,99 @@ get_zip_info <- function(zip_code, population_threshold=50000) {
 #' @return a dataframe with the race responses cleaned
 #' @export
 get_orca_screener <- function(token, min_date_time = "2022-01-01 00:00:00") {
-  library(tidyverse)
-  screener = get_orca_data(token, "orca_screener_survey")
-  screener = select(screener, -redcap_survey_identifier, -rec_unique_record_id, -orca_screener_survey_complete)
-  screener = rename(screener, 
-                    timestamp = orca_screener_survey_timestamp,
-                    language = rec_language_preference,
-                    caregiver_firstname = rec_caregiver_name,
-                    caregiver_lastname = rec_caregiver_name_last,
-                    phone = rec_phone_number,
-                    texting_okay = rec_phone_number_text,
-                    email = rec_caregiver_email,
-                    over_18 = rec_over_18,
-                    zipcode = rec_address_zipcode,
-                    race_other = rec_race_other,
-                    child_yesno = rec_child_yesno,
-                    child_dob = rec_child_dob,
-                    pregnant_yesno = rec_pregnant_yesno,
-                    due_date = rec_due_date,
-                    twin_yesno = rec_twin,
-                    education = rec_education_level)
-  screener$timestamp = strptime(screener$timestamp, format = "%Y-%m-%d %H:%M:%S") 
-  min_date_time = strptime(min_date_time, format = "%Y-%m-%d %H:%M:%S") 
-  screener = filter(screener, timestamp > min_date_time)
-  screener = clean_race(screener)
-  screener$zipcode <- as.integer(screener$zipcode)
-  zip_info <- zips()
-  cities <- city_info()
-  screener <- left_join(screener, zip_info, by="zipcode")
-  screener <- left_join(screener, cities, by="location")
-  screener <- mutate(screener,
-                     rural = ifelse(is.na(population) & !is.na(location), "Y",
-                                    ifelse(population >= 50000, "N",
-                                           ifelse(population < 50000, "Y", "CHECK"))))
-  screener <- mutate(screener, non_white = ifelse(race == "White", "N", "Y"))
-  screener <- mutate(screener, low_ses = ifelse(education == 4, "N",
-                                                ifelse(education == 3, "N", "Y")))
-  screener <- mutate(screener, priority = case_when(
-    rural == 'N' & non_white == 'N' & low_ses == 'N' ~ 'Low Priority',
-    rural == 'Y' | non_white == 'Y' | low_ses == 'Y' ~ 'High Priority'
-  ))
-  
-  screener$current_age <- as.numeric(difftime(Sys.Date(), screener$child_dob, units = 'days'))
-  
-  screener$child_yesno <- ifelse(is.na(screener$child_yesno), 0, screener$child_yesno)
-  screener$pregnant_yesno <- ifelse(is.na(screener$pregnant_yesno), 0, screener$pregnant_yesno)
-  
-  for (i in 1:nrow(screener)){
-    if (screener$child_yesno[i] == 1 & screener$pregnant_yesno[i] == 1) {
-      if (!is.na(screener$current_age[i]) & screener$current_age[i] <= 135) {
-        new_row <- screener[i, ]
-        new_row$child_yesno <- NA
-        new_row$child_dob <- NA
-        screener$pregnant_yesno[i] <- NA
-        screener$due_date[i] <- NA
-        screener <- rbind(screener, new_row)
+  suppressMessages(suppressWarnings({
+    library(tidyverse)
+    screener = get_orca_data(token, "orca_screener_survey")
+    screener = select(screener, -redcap_survey_identifier, -rec_unique_record_id, -orca_screener_survey_complete)
+    screener = rename(screener, 
+                      timestamp = orca_screener_survey_timestamp,
+                      language = rec_language_preference,
+                      caregiver_firstname = rec_caregiver_name,
+                      caregiver_lastname = rec_caregiver_name_last,
+                      phone = rec_phone_number,
+                      texting_okay = rec_phone_number_text,
+                      email = rec_caregiver_email,
+                      over_18 = rec_over_18,
+                      zipcode = rec_address_zipcode,
+                      race_other = rec_race_other,
+                      child_yesno = rec_child_yesno,
+                      child_dob = rec_child_dob,
+                      pregnant_yesno = rec_pregnant_yesno,
+                      due_date = rec_due_date,
+                      twin_yesno = rec_twin,
+                      education = rec_education_level)
+    screener$timestamp = strptime(screener$timestamp, format = "%Y-%m-%d %H:%M:%S") 
+    min_date_time = strptime(min_date_time, format = "%Y-%m-%d %H:%M:%S") 
+    screener = filter(screener, timestamp > min_date_time)
+    
+    if (nrow(screener) >= 1) {
+      screener = clean_race(screener)
+      screener$zipcode <- as.integer(screener$zipcode)
+      zip_info <- zips()
+      cities <- city_info()
+      screener <- left_join(screener, zip_info, by="zipcode")
+      screener <- left_join(screener, cities, by="location")
+      screener <- mutate(screener,
+                         rural = ifelse(is.na(population) & !is.na(location), "Y",
+                                        ifelse(population >= 50000, "N",
+                                               ifelse(population < 50000, "Y", "CHECK"))))
+      screener <- mutate(screener, non_white = ifelse(race == "White", "N", "Y"))
+      screener <- mutate(screener, low_ses = ifelse(education == 4, "N",
+                                                    ifelse(education == 3, "N", "Y")))
+      screener <- mutate(screener, priority = case_when(
+        rural == 'N' & non_white == 'N' & low_ses == 'N' ~ 'Low Priority',
+        rural == 'Y' | non_white == 'Y' | low_ses == 'Y' ~ 'High Priority'
+      ))
+      
+      screener$current_age <- as.numeric(difftime(Sys.Date(), screener$child_dob, units = 'days'))
+      
+      screener$child_yesno <- ifelse(is.na(screener$child_yesno), 0, screener$child_yesno)
+      screener$pregnant_yesno <- ifelse(is.na(screener$pregnant_yesno), 0, screener$pregnant_yesno)
+      
+      for (i in 1:nrow(screener)){
+        if (screener$child_yesno[i] == 1 & screener$pregnant_yesno[i] == 1) {
+          if (!is.na(screener$current_age[i]) & screener$current_age[i] <= 135) {
+            new_row <- screener[i, ]
+            new_row$child_yesno <- NA
+            new_row$child_dob <- NA
+            screener$pregnant_yesno[i] <- NA
+            screener$due_date[i] <- NA
+            screener <- rbind(screener, new_row)
+          }
+        }
       }
+      
+      screener <- mutate(screener, expected_invite_date = case_when(
+        child_yesno == 1 & current_age <= 135 ~ child_dob + 107,
+        pregnant_yesno == 1 ~ due_date + 107
+      ))
+      screener <- unite(screener, caregiver_name, caregiver_firstname, caregiver_lastname, sep = " ", na.rm = TRUE)
+      screener$texting_okay <- gsub(1, "Yes", screener$texting_okay)
+      screener$texting_okay <- gsub(0, "No", screener$texting_okay)
+      screener$over_18 <- gsub(1, "Yes", screener$over_18)
+      screener$over_18 <- gsub(0, "No", screener$over_18)
+      screener$language <- gsub(1, "English", screener$language)
+      screener$language <- gsub(2, "Spanish", screener$language)
+      screener$language <- gsub(3, "Other (check redcap)", screener$language)
+      
+      screener <- screener %>%
+        mutate(rec_source = case_when(
+          rec_source == 1 ~ 'Social media',
+          rec_source == 2 ~ 'Through a friend',
+          rec_source == 3 ~ 'Organization',
+          rec_source == 4 ~ 'Other',
+          is.na(rec_source) ~ NA
+        ))
+      
+      col_order <- c("record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rec_source", "rec_snowball_email", "rural", "non_white", "low_ses", "priority","rec_comments", "expected_invite_date", "bot_check", "bot_pic_answer")
+      screener <- screener[, col_order]
+      screener <- dplyr::arrange(screener, timestamp)
+    } else {
+      print('no new screener responses, returning empty dataframe')
     }
-  }
-  
-  screener <- mutate(screener, expected_invite_date = case_when(
-    child_yesno == 1 & current_age <= 135 ~ child_dob + 107,
-    pregnant_yesno == 1 ~ due_date + 107
-  ))
-  screener <- unite(screener, caregiver_name, caregiver_firstname, caregiver_lastname, sep = " ", na.rm = TRUE)
-  screener$texting_okay <- gsub(1, "Yes", screener$texting_okay)
-  screener$texting_okay <- gsub(0, "No", screener$texting_okay)
-  screener$over_18 <- gsub(1, "Yes", screener$over_18)
-  screener$over_18 <- gsub(0, "No", screener$over_18)
-  screener$language <- gsub(1, "English", screener$language)
-  screener$language <- gsub(2, "Spanish", screener$language)
-  screener$language <- gsub(3, "Other (check redcap)", screener$language)
-  
-  screener <- screener %>%
-    mutate(rec_source = case_when(
-      rec_source == 1 ~ 'Social media',
-      rec_source == 2 ~ 'Through a friend',
-      rec_source == 3 ~ 'Organization',
-      rec_source == 4 ~ 'Other',
-      is.na(rec_source) ~ NA
-    ))
-  
-  col_order <- c("record_id", "caregiver_name", "language", "phone", "texting_okay", "email", "over_18", "zipcode", "child_yesno", "child_dob", "pregnant_yesno", "due_date","twin_yesno", "timestamp","timezone", "location", "rec_source", "rec_snowball_email", "rural", "non_white", "low_ses", "priority","rec_comments", "expected_invite_date", "bot_check", "bot_pic_answer")
-  screener <- screener[, col_order]
-  screener <- dplyr::arrange(screener, timestamp)
+    
+  }))
+
   return (screener)
 }
 
@@ -2006,4 +2015,255 @@ import_mice_to_orca <- function(scr_token, orca_token, mice_record_id) {
   }
   
   import_data(orca_token, import_file)
+}
+
+#' @title Get ORCA Screener Clean
+#' @description Pulls new screener data, determines eligibility for enrollment
+#' @param token Unique REDCap token ID for the New ORCA Recruitment Screener project
+#' @param min_date_time The minimum timestamp to pull responses after
+#' @return A list containing data (screener to enroll), orca15 (potential reef people), prenatal_counts and postnatal_counts
+#' @export
+get_orca_screener_clean <- function(token, min_date_time = '2022-01-01 00:00:00') {
+  suppressMessages(suppressWarnings({
+    cat(
+      '\n\u2728 Screener Pull Summary \u2728',
+      '\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+      '\nThis script will pull screener responses after: ', min_date_time, '\n - check this is after the last row on the excel screener',
+      '\n\n\U0001F7E2 ELIGIBILITY CRITERIA:',
+      '\n  \u2022 Any prenatal participant < 31 weeks gestational age',
+      '\n  \u2022 Any postpartum participant or prenatal > 31 weeks GA',
+      '\n    who is HIGH PRIORITY or has been REFERRED to the study',
+      '\n\n\U0001F534 REMOVAL CRITERIA:',
+      '\n  \u2022 Filled out screener multiple times',
+      '\n  \u2022 Incorrect DOB or due date (e.g., due date in past',
+      '\n  \u2022 Child too old for any study',
+      '\n  \u2022 Failed screener attention checks',
+      '\n  \u2022 Has been referred by a flagged email',
+      '\n\n\U0001F5C2 OUTPUT LIST:',
+      sprintf('\n  \u2022 %-20s %s', 'screener:', 'rows to paste into Excel screener'),
+      sprintf('\n  \u2022 %-20s %s', 'orca15:', 'participants who may live in NYC'),
+      sprintf('\n  \u2022 %-20s %s', 'prenatal_counts:', 'enrolled + new + future invites'),
+      sprintf('\n  \u2022 %-20s %s', 'postnatal_counts:', 'enrolled + future 4m invites'),
+      sprintf('\n  \u2022 %-20s %s', 'ineligible_responses:', 'removed rows with reasons'),
+      '\n\n⚠️  To use different criteria, run the "Screener Pull RAW" script instead.',
+      
+      '\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n'
+    )
+    
+    response <- readline(prompt = cat('Enter y to run function, enter any other key to abort: '))
+    
+    if (response == 'y') {
+      
+      cat(
+        '\n\u2728 Starting Screener Pull \u2728',
+        '\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+        '\n\n Step 1: Checking package installation: '
+      )
+      
+      
+      packages <- c("tidyverse", "zoo", 'zipcodeR','maps')
+      to_install <- packages[!sapply(packages, requireNamespace, quietly = TRUE)]
+      
+      if (length(to_install) > 0) {
+        cat('installing the following packages: ', packages)
+        install.packages(to_install)
+      } else {
+        cat('all packages installed')
+      }
+      
+      
+      library(tidyverse)
+      library(zipcodeR)
+      library(maps)
+      library(zoo)
+      
+      #STEP 1: Pulling and cleaning screener ----
+      
+      cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+          '\nStep 2: Downloading new screener responses...')
+      
+      
+      screener <- get_orca_screener(token, min_date_time = min_date_time)
+      
+      if (nrow(screener) >= 1) {
+        cat(nrow(screener), 'responses returned, starting cleaning')
+        #Screening out already enrolled participants - will leave only new responses that haven't been checked
+        
+        contact_log <- get_orca_data(token, form='contact_log', form_complete = F) %>%
+          filter(!is.na(contact_log_complete))
+        
+        contact_log <- contact_log %>%
+          filter(is.na(orca_contact_yesno)) %>%
+          select(record_id) %>%
+          mutate(new=1)
+        
+        screener <- screener %>%
+          left_join(contact_log, by='record_id') %>%
+          filter(new == 1) %>%
+          select(-new)
+        
+        
+        
+        #STEP 2: Extracting potential orca 1.5/ reef participants----
+        cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+            '\nStep 3: Extracting potential reef/1.5 participants')
+        screener <- screener %>%
+          mutate(orca15 = ifelse(str_detect(location, 'New York') & child_dob <= Sys.Date() & child_dob > (Sys.Date() - 365), 1, 0))
+        orca15 <- screener %>%
+          filter(orca15 == 1)
+        screener <- screener %>%
+          filter(orca15 == 0 | is.na(orca15))
+        
+        cat('\n', nrow(orca15), ' potential reef participants extracted')
+        
+        #STEP 3: Calculating gestational age and prenatal eligibility
+        cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+            '\nStep 4: Calculating prenatal eligibility')
+        
+        screener$weeks_till_birth <- difftime(screener$due_date, Sys.Date(),units='w')
+        screener$gestational_age <- 40 - screener$weeks_till_birth
+        
+        screener <- screener %>%
+          mutate(prenatal_eligible = ifelse(!is.na(due_date) & gestational_age < 31, 1, 0))
+        
+        screener <- screener %>%
+          mutate(prenatal_invite_date = as.Date(ifelse(prenatal_eligible == 1 & gestational_age >= 28, Sys.Date(),
+                                                       ifelse(prenatal_eligible == 1 & gestational_age < 28, due_date-84, NA)), origin='1970-01-01'),
+                 prenatal_invite_month = format(prenatal_invite_date, '%b %y'))
+        
+        
+        cat('\n',nrow(subset(screener, prenatal_eligible == 1)), ' initial eligible prenatal responses')
+        #STEP 4: Determining postnatal eligibility
+        cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+            '\nStep 5: Calculating postnatal eligibility')
+        screener$current_age = as.numeric(difftime(Sys.Date(), screener$child_dob, unit='days'))
+        
+        screener <- screener %>%
+          mutate(postnatal_eligible = ifelse(current_age < 137 | (gestational_age >= 31 & gestational_age < 56) & (priority == 'High Priority' | !is.na(rec_snowball_email)), 1, 0),
+                 postnatal_eligible = ifelse(is.na(postnatal_eligible), 0, postnatal_eligible))
+        
+        
+        cat('\n',nrow(subset(screener, postnatal_eligible == 1)), ' initial eligible postnatal responses')
+        
+        #STEP 5: REMOVING INELIGIBLE RESPONSES 
+        cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+            '\nStep 6: Removing ineligible responses & Checking Final Numbers')
+        
+        screener_checked <- screen_fraudulence(screener)
+        screened <- screener_checked$data
+        
+        ineligible <- screened %>%
+          filter(prenatal_eligible == 0 & postnatal_eligible == 0) %>%
+          mutate(failed_inclusion_checks = 1)
+        
+        screened <- screened %>%
+          filter(prenatal_eligible == 1 | postnatal_eligible == 1)
+        
+        removed <- screener_checked$ineligible_ages %>%
+          full_join(screener_checked$duplicate_contacts) %>%
+          full_join(screener_checked$impossible_due_dates) %>%
+          full_join(screener_checked$flagged_referral) %>%
+          full_join(screener_checked$failed_attention_checks) %>%
+          full_join(ineligible)
+        
+        removed <- removed %>%
+          distinct(record_id, .keep_all = T)
+        
+        cat('\n',nrow(removed), 'removed for ineligibility')
+        
+        if (nrow(subset(screened, prenatal_eligible == 1)) >=1) {
+          cat(
+            '\n\n\u2728 Numbers of eligible prenatal participants \u2728',
+            '\n\n\u2022 Total: ', nrow(subset(screened, prenatal_eligible == 1)),
+            '\n\u2022 T1: ', nrow(subset(screened, gestational_age > 0 & gestational_age < 13)),
+            '\n\u2022 T2: ', nrow(subset(screened, gestational_age >= 13 & gestational_age < 28)),
+            '\n\u2022 T3: ', nrow(subset(screened, gestational_age >= 28 & gestational_age < 31))
+          )
+        } else {
+          cat('\nNo eligible prenatal participants')
+        }
+        
+        if (nrow(subset(screened, postnatal_eligible == 1)) >=1) {
+          cat(
+            '\n\n\u2728 Numbers of eligible postnatal participants \u2728',
+            '\n\u2022 Total: ', nrow(subset(screened, postnatal_eligible == 1)),
+            '\n\u2022 0-3.5m: ', nrow(subset(screened, postnatal_eligible == 1 & ((current_age > 0 & current_age < 107) | (gestational_age >= 31 & gestational_age < 55)))),
+            '\n\u2022 3.5-4.5m (invited immediately): ', nrow(subset(screened, postnatal_eligible == 1 & (current_age >= 107 | gestational_age >= 55)))
+          )
+        } else {
+          cat('\nNo eligible postnatal participants')
+        }
+        
+        
+        #CREATING COUNTS DF
+        #PRENATAL
+        cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+            '\nStep 7: Creating final counts by month datasets')
+        
+        suppressMessages(suppressWarnings({
+          new_prenatal_counts <- data.frame(table(subset(screened, prenatal_eligible == 1)$prenatal_invite_month)) %>%
+            rename(new = Freq, month = Var1) %>%
+            mutate(month = as.yearmon(month, "%b %y")) %>%
+            arrange(month)
+          
+          current_prenatal_counts <- get_expected_invites(token, timepoint='prenatal')$counts%>%
+            rename(existing = total)
+          
+          prenatal_counts <- current_prenatal_counts %>%
+            full_join(new_prenatal_counts, by='month')
+          prenatal_counts$total <- rowSums(prenatal_counts[, c('existing', 'new')], na.rm=T)
+          
+          #POSTNATAL
+          screened <- screened %>%
+            mutate(expected_invite_month = format(expected_invite_date, '%b %y'))
+          
+          current_postnatal_counts <- get_expected_invites(token, timepoint='4m')$counts
+          new_postnatal_counts <- data.frame(table(screened$expected_invite_month)) %>%
+            rename(new = Freq, month = Var1) %>%
+            mutate(month = as.yearmon(month, "%b %y")) %>%
+            arrange(month)
+          
+          postnatal_counts <- full_join(current_postnatal_counts, new_postnatal_counts, by='month') 
+          postnatal_counts$total <- rowSums(postnatal_counts[, c('orca_total', 'mice_total', 'new')], na.rm=T)
+          
+        }))
+        
+        
+        
+        #SAVING LIST
+        cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+            '\nStep 8: Cleaning dataset and building list')
+        screened <- screened %>%
+          select(-rec_snowball_email, -orca15:-expected_invite_month)
+        
+        result <- list(screener = screened, orca15 = orca15, prenatal_counts = prenatal_counts, postnatal_counts = postnatal_counts)
+        
+        cat('\n','Screener pull complete')
+        return (result)
+        
+      } else {
+        cat('\n','No new screener responses! No list returned')
+      }
+      
+      
+    } else {
+      print('Recruitment pull aborted')
+      return(NA)
+    }
+    
+  }))
+  
+} 
+
+#IN PROGRESS
+get_response_rates <- function(screener_token, orca_token) {
+  #to do' 
+  #complete a prenatal call out of prenatal invites
+  #consent to mice out of prenatal invites
+  #consent to orca out of prenatal invites
+  #complete peach out of prenatal invites? or out of people who show interest in peach at prenatal call?
+  #complete 4m out of mice participants
+  #complete 4m out of people who did only prenatal surveys
+  #complete 8m out of people who did 4m 
+  #complete 12m out of people who did 4m (or 4m and 8m?)
 }
