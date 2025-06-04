@@ -2236,7 +2236,8 @@ get_orca_screener_clean <- function(token, min_date_time = '2022-01-01 00:00:00'
         screened <- screened %>%
           select(-rec_snowball_email, -orca15:-expected_invite_month)
         
-        result <- list(screener = screened, orca15 = orca15, prenatal_counts = prenatal_counts, postnatal_counts = postnatal_counts)
+        result <- list(screener = screened, orca15 = orca15, prenatal_counts = prenatal_counts, postnatal_counts = postnatal_counts,
+                       ineligible_responses = removed)
         
         cat('\n','Screener pull complete')
         return (result)
