@@ -1455,6 +1455,8 @@ get_orca_cohort <- function(token, screener=F) {
 #' @return A list with dataframe of all invites, bar chart, and dataframe with invite counts per month
 #' @export
 get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
+  library(dplyr)
+  library(zoo)
   age_in <- case_when(
     timepoint == '4m' ~ 107,
     timepoint == '8m' ~ 228,
@@ -1512,7 +1514,7 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
     data <- screener_cohort %>%
       left_join(child_dob, by='record_id') %>%
       filter(orca == 1 | mice == 1) %>%
-      select(record_id, final_dob)
+      select(record_id, final_dob, orca, mice)
     
     data$exp_invite_date = data$final_dob + 107
     
@@ -1570,11 +1572,26 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
   
   
   #creating data frame with counts per month 
-  counts <- data.frame(table(data$invite_month)) %>%
-    rename(total = Freq)
-  
-  counts <- counts %>%
-    rename(month = Var1)
+  if (timepoint == '4m') {
+    orca_counts = data.frame(table(subset(data, orca == 1)$invite_month)) %>%
+      rename(month = Var1, orca_total = Freq) %>%
+      mutate(month = as.yearmon(month, "%b %y")) %>%
+      arrange(month)
+    
+    mice_counts = data.frame(table(subset(data, mice == 1)$invite_month)) %>%
+      rename(month = Var1, mice_total = Freq) %>%
+      mutate(month = as.yearmon(month, "%b %y")) %>%
+      arrange(month)
+    
+    counts = full_join(orca_counts, mice_counts, by='month')
+    
+  } else {
+    counts <- data.frame(table(data$invite_month)) %>%
+      rename(total = Freq, month = Var1) %>%
+      mutate(month = as.yearmon(month, "%b %y")) %>%
+      arrange(month)
+    
+  }
   
   result <- list(data = data, plot = plot, counts = counts)
   
