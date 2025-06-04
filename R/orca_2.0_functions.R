@@ -1466,7 +1466,7 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
   #SCREENER PROJECT DEPENDENT - prenatal, peach, 4m
   #ORCA PROJECT DEPENDENT - 8m, 12m
   
-  if (timepoint == 'prenatal' | timepoint == 'newborn') {
+  if (timepoint == 'prenatal') {
     screener_cohort <- get_orca_cohort(token, screener=T)
     due_date <- get_orca_field(token, field='rec_due_date')
     
@@ -1511,7 +1511,7 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
     
     data <- screener_cohort %>%
       left_join(child_dob, by='record_id') %>%
-      filter(orca == 1) %>%
+      filter(orca == 1 | mice == 1) %>%
       select(record_id, final_dob)
     
     data$exp_invite_date = data$final_dob + 107
