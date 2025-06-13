@@ -14,7 +14,7 @@ get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_
   if (form_complete) {
     record_filter = paste("[", form, "_complete]=2", sep = "")
   } else {
-    record_filter = ""
+    record_filter = paste("[", form, '_complete] <> ""', sep = "")
   }
   formData <- list(uri = url,
                    "token"=token,
@@ -67,7 +67,8 @@ get_orca_field <- function(token = token, field=field, raw_v_label = 'raw') {
                    exportCheckboxLabel='false',
                    exportSurveyFields='false',
                    exportDataAccessGroups='false',
-                   returnFormat='csv')
+                   returnFormat='csv',
+                   filterLogic=paste("[", field, '] <> ""', sep = ""))
   
   response <- httr::POST(url, body = formData, encode = "form")
   df <- httr::content(response)
@@ -1973,23 +1974,23 @@ get_prenatal_dob <- function(token) {
 #' @return User input for approval to import (respond y)
 #' @export
 import_mice_to_orca <- function(scr_token, orca_token, mice_record_id) {
-  mice_ids <- get_orca_field(token, field='mice_id')
+  mice_ids <- get_orca_field(scr_token, field='mice_id')
   
   mice_ids <- mice_ids %>%
     filter(mice_id == mice_record_id)
   
   sri = mice_ids$record_id[1]
   
-  prenatal_surveys = get_orca_field(token, field='prams_complete') %>%
+  prenatal_surveys = get_orca_field(scr_token, field='prams_complete') %>%
     filter(record_id == sri)
   
-  pch_complete = get_orca_field(token, field='pch_enroll_complete') %>%
+  pch_complete = get_orca_field(scr_token, field='pch_enroll_complete') %>%
     filter(record_id == sri)
   
-  blood_returned = get_orca_field(token, field='mice_returned') %>%
+  blood_returned = get_orca_field(scr_token, field='mice_returned') %>%
     filter(record_id == sri)
   
-  mc_consent <- get_orca_field(token, field='mice_consent_date') %>%
+  mc_consent <- get_orca_field(scr_token, field='mice_consent_date') %>%
     filter(record_id == sri)
   
   prenatal <- ifelse(nrow(prenatal_surveys) == 1 & prenatal_surveys$prams_complete[1] == 2, 1, 0)
