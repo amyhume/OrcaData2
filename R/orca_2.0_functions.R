@@ -68,7 +68,8 @@ get_orca_field <- function(token = token, field=field, raw_v_label = 'raw') {
                    exportSurveyFields='false',
                    exportDataAccessGroups='false',
                    returnFormat='csv',
-                   filterLogic=paste("[", field, '] <> ""', sep = ""))
+                   filterLogic=paste("[", field, '] <> ""', sep = "")
+                   )
   
   response <- httr::POST(url, body = formData, encode = "form")
   df <- httr::content(response)
@@ -78,13 +79,18 @@ get_orca_field <- function(token = token, field=field, raw_v_label = 'raw') {
   df[df == -999] = NA
   df[df == 999] = NA
   df[df == 9999] = NA
-  df <- dplyr::select(df, record_id, redcap_event_name, all_of(field))
-  df <- df[!is.na(df[[field]]),]
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "test"))
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "IRB"))
-  df <- dplyr::filter(df, !stringr::str_detect(record_id, "D"))
-  df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
+  
+  if (nrow(df) > 0) {
+    df <- dplyr::select(df, record_id, redcap_event_name, all_of(field))
+    df <- df[!is.na(df[[field]]),]
+    df <- dplyr::filter(df, !stringr::str_detect(record_id, "TEST"))
+    df <- dplyr::filter(df, !stringr::str_detect(record_id, "test"))
+    df <- dplyr::filter(df, !stringr::str_detect(record_id, "IRB"))
+    df <- dplyr::filter(df, !stringr::str_detect(record_id, "D"))
+    df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
+  } else {
+    print('empty dataset returned')
+  }
   return (df)
 }
 
@@ -1514,6 +1520,10 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
     data <- data %>%
       mutate(invite_month = format(exp_invite_date, "%b %y"))
     
+    data <- data %>%
+      filter(exp_invite_date >= Sys.Date()) %>%
+      arrange(exp_invite_date)
+    
   } else if (timepoint == '4m') {
     screener_cohort <- get_orca_cohort(token, screener=T)
     child_dob <- get_screener_child_dob(token)
@@ -1550,6 +1560,7 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
     
     
   }
+
   
   if (max_date != 'none') {
     max_date = as.Date(max_date, format='%Y-%m-%d')
@@ -1941,14 +1952,17 @@ get_prenatal_dob <- function(token) {
     select(-redcap_event_name)
   bu1 <- get_orca_field(token, field='child_dob_update')%>%
     select(-redcap_event_name)
-  bu2 <- get_orca_field(token, field='child_dob_update_fup')%>%
-    select(-redcap_event_name)
+  bu2 <- get_orca_field(token, field='child_dob_update_fup')
   
+  if (nrow(bu2) > 0) {
+    bu2 <- select(bu2, -redcap_event_name)
+  } else {
+    bu2 <- data.frame(record_id = as.numeric(), child_dob_update_fup = as.Date(as.character()))
+  }
   
   dobs <- dd %>%
     full_join(bu1) %>%
     full_join(bu2)
-  
   dobs <- dobs %>%
     distinct(record_id, .keep_all = T)
   
