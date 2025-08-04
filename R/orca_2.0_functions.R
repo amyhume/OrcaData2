@@ -11,11 +11,8 @@ url <- 'https://redcap.nyu.edu/api/'
 #' @return A data frame with the retrieved data
 #' @export
 get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_complete = T) {
-  if (form_complete) {
-    record_filter = paste("[", form, "_complete]=2", sep = "")
-  } else {
-    record_filter = paste("[", form, '_complete] <> ""', sep = "")
-  }
+  complete_col = paste(form, '_complete', sep="")
+  
   formData <- list(uri = url,
                    "token"=token,
                    content='record',
@@ -29,8 +26,7 @@ get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_
                    exportCheckboxLabel='false',
                    exportSurveyFields='true',
                    exportDataAccessGroups='false',
-                   returnFormat='csv',
-                   filterLogic=record_filter)
+                   returnFormat='csv')
   
   response <- httr::POST(url, body = formData, encode = "form")
   df <- httr::content(response)
@@ -40,6 +36,11 @@ get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_
     df <- dplyr::filter(df, !stringr::str_detect(record_id, "IRB"))
     df <- dplyr::filter(df, !stringr::str_detect(record_id, "D"))
     df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
+    
+    if (form_complete) {
+      subset_data <- df[df[[complete_col]] == 2 & !is.na(df[[complete_col]]), ]
+    }
+    
   } else {
     print('no data returned - may need to set form_complete = F')
   }
@@ -2215,7 +2216,6 @@ get_orca_screener_clean <- function(token, min_date_time = '2022-01-01 00:00:00'
         cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
             '\nStep 7: Creating final counts by month datasets')
         
-        suppressMessages(suppressWarnings({
           new_prenatal_counts <- data.frame(table(subset(screened, prenatal_eligible == 1)$prenatal_invite_month)) %>%
             rename(new = Freq, month = Var1) %>%
             mutate(month = as.yearmon(month, "%b %y")) %>%
