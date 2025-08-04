@@ -2240,11 +2240,7 @@ get_orca_screener_clean <- function(token, min_date_time = '2022-01-01 00:00:00'
           
           postnatal_counts <- full_join(current_postnatal_counts, new_postnatal_counts, by='month') 
           postnatal_counts$total <- rowSums(postnatal_counts[, c('orca_total', 'mice_total', 'new')], na.rm=T)
-          
-        }))
-        
-        
-        
+
         #SAVING LIST
         cat('\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
             '\nStep 8: Cleaning dataset and building list')
