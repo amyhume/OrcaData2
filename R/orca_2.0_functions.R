@@ -38,7 +38,7 @@ get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_
     df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
     
     if (form_complete) {
-      subset_data <- df[df[[complete_col]] == 2 & !is.na(df[[complete_col]]), ]
+      df <- df[df[[complete_col]] == 2 & !is.na(df[[complete_col]]), ]
     }
     
   } else {
@@ -1900,7 +1900,7 @@ get_orca_ders <- function(token, timepoint = 'orca_4month_arm_1', timestamp=T) {
 #' @export
 get_orca_bitsea <- function(token, timestamp=T) {
   library(stringr)
-  bitsea = get_orca_data(token, "brief_infant_toddler_social_and_emotional_assessme")
+  bitsea = get_orca_data(token, "brief_infant_toddler_social_and_emotional_assessme", form_complete = T)
   bitsea$record_id = str_remove(bitsea$record_id, "^0+")
   bitsea[bitsea == -888] = NA
   bitsea[bitsea == 999] = NA
