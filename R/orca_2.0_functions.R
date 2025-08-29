@@ -2279,3 +2279,112 @@ get_response_rates <- function(screener_token, orca_token) {
   #complete 8m out of people who did 4m 
   #complete 12m out of people who did 4m (or 4m and 8m?)
 }
+
+#' @title PEACH Enrollment Function
+#' @description For a given screener record id, it'll pull their peach participant info from screener, reformat and import to PEACH redcap. It'll also update pch_enroll_complete field on screener 
+#' @param screener_token Unique REDCap token ID for the New ORCA Recruitment Screener project
+#' @param peach_token Unique REDCap token ID for the PEACH project
+#' @param sri Screener record id for who you which to import
+#' @return A list containing data (screener to enroll), orca15 (potential reef people), prenatal_counts and postnatal_counts
+#' @export
+peach_enroll <- function(screener_token, peach_token, sri = '') {
+  library(tidyverse)
+  
+  if (screener_record_id == '') {
+    print("Cannot process without entering screener record id for who you wish to enroll, e.g. '4657'")
+  } else {
+    #pulling non responders 
+    nr <- get_orca_field(screener_token, field='pch_non_respond')
+    nr <- nr %>%
+      select(-redcap_event_name)
+    
+    #pulling birth updates
+    dob <- get_orca_field(screener_token, field='child_dob_update')
+    dob <- dob %>%
+      select(record_id, child_dob_update)
+    
+    timezone <- get_orca_field(screener_token, field='timezone')
+    timezone <- timezone %>%
+      select(-redcap_event_name)
+    
+    #Pulling peach participant info forms from screener
+    pch_info <- get_orca_data(screener_token, form='peach_participant_information')
+    
+    #Pulling peach consent info from screener (to catch people who have consented but not done participant info)
+    pch_consents <- get_orca_data(screener_token, form='peach_informed_consent_updated')
+    
+    new_pch <- pch_consents %>%
+      filter(pch_consent_yesno_v2 == 1) %>%
+      select(record_id, consent_date_pch_v2) %>%
+      left_join(pch_info, by='record_id') %>%
+      left_join(timezone, by='record_id')
+    
+    #checking incomplete IDs
+    incomplete_forms <- new_pch %>%
+      filter(!is.na(consent_date_pch_v2) & is.na(peach_participant_information_complete))
+    incomplete_forms <- incomplete_forms$record_id
+    if (length(incomplete_forms) > 0) {
+      cat('The following IDs have completed consent but not participant information. Please follow up\n',
+          incomplete_forms)
+    }
+    
+    #getting relevant columns
+    new_pch <- new_pch %>%
+      filter(peach_participant_information_complete == 2) %>%
+      select(record_id, consent_date_pch_v2, prenatal_yesno:pm_survey_time) %>%
+      left_join(dob, by='record_id') %>%
+      left_join(nr, by='record_id')
+    
+    new_pch <- new_pch %>%
+      filter(is.na(pch_non_respond) | pch_non_respond == 0)
+    
+    #Pulling screener record ids from PEACH project - removing those from screener df who have already enrolled
+    pch_ids <- get_orca_field(peach_token, field='screener_record_id')
+    screener_ids <- unique(pch_ids$screener_record_id)
+    #existing pch_ids
+    pch_ids <- unique(pch_ids$record_id)
+    pch_ids <- pch_ids[str_detect(pch_ids, 'pch_')]
+    
+    import_file <- new_pch %>%
+      rename(screener_record_id = record_id)
+    
+    import_file <- import_file %>%
+      filter(!screener_record_id %in% screener_ids)
+    
+    import_file <- import_file %>%
+      filter(screener_record_id == sri) ## ADDED by AA to only include specific users
+    
+    #assigning new ids!
+    import_file$record_id <- assign_ids(pch_ids, import_file$screener_record_id, prefix='pch_')
+    
+    import_file <- import_file %>%
+      select(-consent_date_pch_v2, -pch_non_respond)
+    
+    import_file <- import_file %>%
+      mutate(redcap_event_name = 'initial_data_arm_1')
+    
+    import_file <- import_file %>%
+      filter(!str_detect(screener_record_id, 'test')) 
+    
+    import_file <- import_file %>%
+      rename(child_dob = child_dob_update)
+    
+    #IMPORTS PARTICIPANT DATA TO PEACH 
+    
+    if (nrow(import_file) > 0) {
+      import_data(peach_token, import_file)
+      
+      #IMPORTS ENROLLMENT STATUS BACK TO SCREENER REDCAP
+      import_file2 <- import_file %>%
+        select(screener_record_id) %>%
+        mutate(redcap_event_name = 'orca_screener_arm_1') %>%
+        mutate(pch_enroll_complete = Sys.Date()) %>%
+        rename(record_id = screener_record_id)
+      
+      import_data(screener_token, import_file2)
+    } else {
+      print('This participant cannot be enrolled as they are already in peach project. Check and try again')
+    }
+    
+  }
+}
