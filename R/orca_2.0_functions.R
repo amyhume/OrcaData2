@@ -2388,3 +2388,188 @@ peach_enroll <- function(screener_token, peach_token, sri = '') {
     
   }
 }
+
+#' @title Process BISBAS Data
+#' @description This function will download and return the sum scores for the BISBAS
+#' @param token Unique REDCap token ID for New ORCA Recruitment Screener project
+#' @param timestamp whether to include survey timestamp. Default is true
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_bisbas <- function(token, timestamp=T) {
+  print('This is a prenatal survey. Make sure you have used token from New ORCA Recruitment Screener project')
+  library(dplyr)
+  
+  bisbas <- get_orca_data(token, form='behavioral_inhibition_and_behavioral_approach_syst')
+  
+  #reverse scoring
+  reversed <- c("bisbas1","bisbas3","bisbas4","bisbas5","bisbas6" ,"bisbas7",  
+                "bisbas8",  "bisbas9",  "bisbas10", "bisbas11", "bisbas12", "bisbas13","bisbas14",
+                "bisbas15", "bisbas16", "bisbas17", "bisbas18", "bisbas19" ,"bisbas20", "bisbas21", "bisbas23", "bisbas24")
+  
+  bisbas[reversed] <- lapply(bisbas[reversed], function(x) 5 - x)
+  
+  #subscales - 1, 6, 11, 17 are filler items and not included at any scale
+  bas_drive <- c('bisbas3', 'bisbas9', 'bisbas12', 'bisbas21')
+  bas_fun <- c('bisbas5', 'bisbas10', 'bisbas15', 'bisbas20')
+  bas_reward <- c('bisbas4', 'bisbas7', 'bisbas14', 'bisbas18', 'bisbas23')
+  bis <- c('bisbas2', 'bisbas8', 'bisbas13', 'bisbas16', 'bisbas19', 'bisbas22', 'bisbas24')
+  
+  bisbas$bas_drive <- rowSums(bisbas[, bas_drive], na.rm=T)
+  bisbas$bas_fun <- rowSums(bisbas[, bas_fun], na.rm=T)
+  bisbas$bas_reward <- rowSums(bisbas[, bas_reward], na.rm=T)
+  bisbas$bis <- rowSums(bisbas[, bis], na.rm=T)
+  
+  
+  
+  #Cronbachs alpha 
+  library(psych)
+  drive_alpha <- alpha(bisbas[, bas_drive])
+  drive_alpha <- drive_alpha$total$raw_alpha
+  
+  fun_alpha <- alpha(bisbas[, bas_fun])
+  fun_alpha <- fun_alpha$total$raw_alpha
+  
+  reward_alpha <- alpha(bisbas[, bas_reward])
+  reward_alpha <- reward_alpha$total$raw_alpha
+  
+  bis_alpha <- alpha(bisbas[, bis])
+  bis_alpha <- bis_alpha$total$raw_alpha
+  
+  if (timestamp) {
+    bisbas = bisbas[,c("record_id", "behavioral_inhibition_and_behavioral_approach_syst_timestamp", 
+                       'bas_drive', 'bas_fun', 'bas_reward', 'bis')]
+  } else if (!timestamp) {
+    bisbas = bisbas[,c("record_id", 
+                       'bas_drive', 'bas_fun', 'bas_reward', 'bis')]
+  }
+  
+  cat('\nBIS/BAS Reference:
+      \nCarver, C. S., & White, T. L. (1994). Behavioral inhibition, 
+      behavioral activation, and affective responses to impending 
+      reward and punishment: The BIS/BAS scales. Journal of Personality 
+      and Social Psychology, 67, 319-333. \n')
+  
+  cat('\nSubscales were scored (sums) using the following guide: \n',
+      'https://www.psy.miami.edu/faculty/ccarver/bisbas.html \n')
+  
+  cat("\nCronbach's alpha for each subscale of BIS/BAS: ", '\n',
+      '• BAS Drive: ', round(drive_alpha, digits=3), '\n',
+      '• BAS Fun Seeking: ', round(fun_alpha, digits=3), '\n',
+      '• BAS Reward Responsiveness: ', round(reward_alpha, digits=3), '\n',
+      '• BIS (Behavioral Inhibition): ', round(bis_alpha, digits=3), '\n')
+  
+  
+  return(bisbas)
+  
+}
+
+#' @title Process Discrimination Data
+#' @description This function will download and return the sum score for the discrimination q - not extra items
+#' @param token Unique REDCap token ID for New ORCA Recruitment Screener project
+#' @param timestamp whether to include survey timestamp. Default is true
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_discrimination <- function(token, timestamp=T) {
+  library(dplyr)
+  library(psych)
+  dis <- get_orca_data(token, form='discrimination_questionnaire')
+  
+  dis$discrimination_score = rowSums(dis[, c('discrim_q1', 'discrim_q2', 'discrim_q3', 'discrim_q4', 'discrim_q5', 'discrim_q6',
+                                             'discrim_q7', 'discrim_q8', 'discrim_q9')], na.rm=T)
+  
+  dis <- dis %>%
+    rename(discrimination_timestamp = discrimination_questionnaire_timestamp)
+  
+  #Cronbachs alpha
+  dis_alpha = alpha(dis[, c('discrim_q1', 'discrim_q2', 'discrim_q3', 'discrim_q4', 'discrim_q5', 'discrim_q6',
+                            'discrim_q7', 'discrim_q8', 'discrim_q9')])
+  
+  dis_alpha = dis_alpha$total$raw_alpha
+  
+  cat("\nCronbach's alpha for Discrimination Questionnaire: ", '\n',
+      '• Alpha: ', round(dis_alpha, digits=3), '\n')
+  
+  if (timestamp) {
+    dis = dis[,c("record_id", "discrimination_timestamp", 
+                 'discrimination_score', 'discrim_stress')]
+  } else if (!timestamp) {
+    dis = dis[,c("record_id", 
+                 'discrimination_score', 'discrim_stress')]
+  }
+  
+  return(dis)
+}
+
+#' @title Process Social Support Data
+#' @description This function will download and return the sum and mean scores for the social support scale
+#' @param token Unique REDCap token ID
+#' @param timepoint Redcap event name for timepoint you wish to pull
+#' @param timestamp whether to include survey timestamp. Default is true
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_social_support <- function(token, timepoint = 'orca_4month_arm_1', timestamp=T) {
+  library(dplyr)
+  library(psych)
+  
+  ss = get_orca_data(token, form='social_support_sv')
+  
+  ss = ss %>%
+    filter(redcap_event_name==timepoint)
+  
+  ss$ss_sum_score <- rowSums(ss[, c('ss1', 'ss2', 'ss3', 'ss4', 'ss5', 'ss6', 'ss7')], na.rm=T)
+  ss$ss_mean_score <- rowMeans(ss[, c('ss1', 'ss2', 'ss3', 'ss4', 'ss5', 'ss6', 'ss7')], na.rm=T)
+  
+  #Cronbachs alpha 
+  ss_alpha <- alpha(ss[, c('ss1', 'ss2', 'ss3', 'ss4', 'ss5', 'ss6', 'ss7')])
+  ss_alpha <- ss_alpha$total$raw_alpha
+  
+  cat("\nCronbach's alpha for Social Support Questionnaire: ", '\n',
+      '• Alpha: ', round(ss_alpha, digits=3), '\n')
+  
+  if (timestamp) {
+    ss = ss[,c("record_id", "social_support_sv_timestamp", 
+               'ss_sum_score', 'ss_mean_score')]
+  } else if (!timestamp) {
+    ss = ss[,c("record_id",
+               'ss_sum_score', 'ss_mean_score')]
+  }
+  
+  return(ss)
+}
+
+#' @title Process Cambridge Worry Scale Data
+#' @description This function will download and return the mean scores for the cambridge worry scale
+#' @param token Unique REDCap token ID
+#' @param timestamp whether to include survey timestamp. Default is true
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_cws <- function(token, timestamp = T) {
+  library(dplyr)
+  library(psych)
+  
+  cws <- get_orca_data(token, form='cambridge_worry_scale')
+  
+  cws$cws_mean_score <- rowMeans(cws[, c('cws1', 'cws2', 'cws3', 'cws4', 'cws5', 'cws6', 'cws7',
+                                         'cws8', 'cws9', 'cws10', 'cws11', 'cws12', 'cws13', 'cws14',
+                                         'cws15', 'cws16')], na.rm=T)
+  
+  #Internal validity / cronbachs alpha
+  cws_alpha <- alpha(cws[, c('cws1', 'cws2', 'cws3', 'cws4', 'cws5', 'cws6', 'cws7',
+                             'cws8', 'cws9', 'cws10', 'cws11', 'cws12', 'cws13', 'cws14',
+                             'cws15', 'cws16')])
+  cws_alpha <- cws_alpha$total$raw_alpha
+  
+  cat("\nCronbach's alpha for Cambridge Worry Scale Questionnaire: ", '\n',
+      '• Alpha: ', round(cws_alpha, digits=3), '\n')
+  
+  if (timestamp) {
+    cws = cws[,c("record_id", "cambridge_worry_scale_timestamp", 
+                 'cws_mean_score')]
+  } else if (!timestamp) {
+    cws = cws[,c("record_id",
+                 'cws_mean_score')]
+  }
+  
+  return(cws)
+  
+}
