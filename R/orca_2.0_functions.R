@@ -2140,7 +2140,7 @@ get_orca_screener_clean <- function(token, min_date_time = '2022-01-01 00:00:00'
         screener$gestational_age <- 40 - screener$weeks_till_birth
         
         screener <- screener %>%
-          mutate(prenatal_eligible = ifelse(!is.na(due_date) & gestational_age < 31, 1, 0))
+          mutate(prenatal_eligible = ifelse(!is.na(due_date) & gestational_age < 31 & (non_white == 'Y' | low_ses == 'Y' | !is.na(rec_snowball_email)), 1, 0))
         
         screener <- screener %>%
           mutate(prenatal_invite_date = as.Date(ifelse(prenatal_eligible == 1 & gestational_age >= 28, Sys.Date(),
@@ -2155,7 +2155,7 @@ get_orca_screener_clean <- function(token, min_date_time = '2022-01-01 00:00:00'
         screener$current_age = as.numeric(difftime(Sys.Date(), screener$child_dob, unit='days'))
         
         screener <- screener %>%
-          mutate(postnatal_eligible = ifelse(current_age < 137 | (gestational_age >= 31 & gestational_age < 56) & (priority == 'High Priority' | !is.na(rec_snowball_email)), 1, 0),
+          mutate(postnatal_eligible = ifelse(current_age < 137 | (gestational_age >= 31 & gestational_age < 56) & (non_white == 'Y' | low_ses == 'Y' | !is.na(rec_snowball_email)), 1, 0),
                  postnatal_eligible = ifelse(is.na(postnatal_eligible), 0, postnatal_eligible))
         
         
