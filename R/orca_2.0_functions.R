@@ -1389,8 +1389,13 @@ get_orca_cohort <- function(token, screener=F) {
   if (!screener) {
     records <- get_orca_field(token, field='record_id')
     records <- records %>%
-      filter(redcap_event_name == 'orca_4month_arm_1') %>%
+      filter(redcap_event_name == 'orca_4month_arm_1' | redcap_event_name == 'mice_4month_arm_4') %>%
       select(record_id)
+    
+    if (nrow(records) == 0) {
+      print('Wrong token used: must use token for ORCA 2.0 Project')
+      return(NA)
+    }
     
     #eligibility fields
     to_keep <- get_orca_field(token, field='optout_yesno') %>%
@@ -1398,14 +1403,17 @@ get_orca_cohort <- function(token, screener=F) {
     
     long <- get_orca_field(token, field='longitudinal_yesno') %>%
       select(-redcap_event_name)
+    long_mc <- get_orca_field(token, field='mc_longitudinal_yesno') %>%
+      select(-redcap_event_name)
     
     records <- records %>%
       left_join(to_keep, by="record_id") %>%
-      left_join(long, by='record_id')
+      left_join(long, by='record_id') %>%
+      left_join(long_mc, by='record_id')
     
     records <- records %>%
       filter(optout_yesno == 0 | is.na(optout_yesno)) %>%
-      filter(longitudinal_yesno != 0 & !is.na(longitudinal_yesno)) %>%
+      filter(longitudinal_yesno == 1 | mc_longitudinal_yesno == 1) %>%
       filter(!str_detect(record_id, 'P'))
     
     records <- records %>%
@@ -1414,11 +1422,14 @@ get_orca_cohort <- function(token, screener=F) {
     
     #visit date info
     date_4m <- get_orca_field(token, field='visit_date_4m')
+    date_4m_mc <- get_orca_field(token, field='mc_visit_date_4m')
+    date_4m_mc2 <- get_orca_field(token, field='mc_visit_date2_4m')
     date_8m <- get_orca_field(token, field='visit_date_8m')
     date_12m <- get_orca_field(token, field='visit_date_12m')
-    #date_12m <- get_orca_field(token, field='visit_date_12m')
     
     visit_dates <- date_4m %>%
+      left_join(date_4m_mc, by='record_id') %>%
+      left_join(date_4m_mc2, by='record_id') %>%
       left_join(date_8m, by='record_id') %>%
       left_join(date_12m)
     
@@ -1437,6 +1448,11 @@ get_orca_cohort <- function(token, screener=F) {
     records <- records %>%
       filter(redcap_event_name == 'orca_screener_arm_1') %>%
       select(-redcap_event_name)
+    
+    if (nrow(records) == 0) {
+      print('Wrong token used: must use token for New ORCA Recruitment Screener Project')
+      return(NA)
+    }
     
     #pulling enrollment info
     eligibility <- get_orca_data(token, form='contact_log', form_complete = F) %>%
@@ -1559,7 +1575,9 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
       select(-child_dob) %>%
       filter(exp_invite_date > Sys.Date())
     
-    
+    data <- data %>%
+      mutate(orca = ifelse(!str_detect(record_id, 'mc_'), 1, 0),
+             mice = ifelse(str_detect(record_id, 'mc_'), 1, 0))
   }
 
   
@@ -1594,7 +1612,7 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
   
   
   #creating data frame with counts per month 
-  if (timepoint == '4m') {
+  if (timepoint == '4m' | timepoint == '8m' | timepoint == '12m') {
     orca_counts = data.frame(table(subset(data, orca == 1)$invite_month)) %>%
       rename(month = Var1, orca_total = Freq) %>%
       mutate(month = as.yearmon(month, "%b %y")) %>%
@@ -1606,14 +1624,13 @@ get_expected_invites <- function(token, timepoint = '4m', max_date = 'none') {
       arrange(month)
     
     counts = full_join(orca_counts, mice_counts, by='month')
-    
   } else {
-    counts <- data.frame(table(data$invite_month)) %>%
-      rename(total = Freq, month = Var1) %>%
+    counts = data.frame(table(data$invite_month)) %>%
+      rename(month = Var1, orca_total = Freq) %>%
       mutate(month = as.yearmon(month, "%b %y")) %>%
       arrange(month)
-    
   }
+    
   
   result <- list(data = data, plot = plot, counts = counts)
   
