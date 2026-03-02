@@ -2239,7 +2239,7 @@ get_orca_screener_clean <- function(token, min_date_time = '2022-01-01 00:00:00'
             arrange(month)
           
           current_prenatal_counts <- get_expected_invites(token, timepoint='prenatal')$counts%>%
-            rename(existing = total)
+            rename(existing = orca_total)
           
           prenatal_counts <- current_prenatal_counts %>%
             full_join(new_prenatal_counts, by='month')
