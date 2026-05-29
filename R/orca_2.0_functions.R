@@ -741,6 +741,7 @@ clean_birthweight <- function(data) {
 #' @export
 calculate_itn <- function(data) {
   #creating poverty guideline data base (2024)
+  data$children_home <- floor(data$children_home)
   poverty_guidelines <- data.frame(
     household_n = c(1,2,3,4,5,6,7,8),
     income_threshold = c(15060,20440,25820,31200,36580,41960,47340,52720)
