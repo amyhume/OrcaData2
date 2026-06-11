@@ -35,7 +35,7 @@ get_orca_data <- function(token = token, form = form, raw_v_label = 'raw', form_
     df <- dplyr::filter(df, !stringr::str_detect(record_id, "test"))
     df <- dplyr::filter(df, !stringr::str_detect(record_id, "IRB"))
     df <- dplyr::filter(df, !stringr::str_detect(record_id, "D"))
-    df <- dplyr::filter(df, record_id != '496' & record_id != '497' & record_id != '498' & record_id != '499')
+    df <- dplyr::filter(df, record_id != '497' & record_id != '498' & record_id != '499')
     
     if (form_complete) {
       df <- df[df[[complete_col]] == 2 & !is.na(df[[complete_col]]), ]
