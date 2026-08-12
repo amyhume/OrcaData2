@@ -2591,3 +2591,117 @@ get_orca_cws <- function(token, timestamp = T) {
   return(cws)
   
 }
+
+#' @title Process BSI 18 Data
+#' @description This function will download and return the sum scores for the Brief Symptom Inventory
+#' @param token Unique REDCap token ID for New ORCA Recruitment Screener project
+#' @param timestamp whether to include survey timestamp. Default is true
+#' @return A data frame for the completed surveys
+#' @export
+get_orca_bsi <- function(token, timestamp=T) {
+  print('This is a prenatal survey. Make sure you have used token from New ORCA Recruitment Screener project')
+  library(dplyr)
+  
+  bsi <- get_orca_data(token, form='brief_symptom_inventory_18')
+  
+  #subscales -
+  bsi_somatization <- c('bsi1', 'bsi4', 'bsi7', 'bsi10', 'bsi13', 'bsi16')
+  bsi_depression <- c('bsi2', 'bsi5', 'bsi8', 'bsi11', 'bsi14', 'bsi17')
+  bsi_anxiety <- c('bsi3', 'bsi6', 'bsi9', 'bsi12', 'bsi15', 'bsi18')
+  
+  bsi$bsi_somatization <- rowSums(bsi[, bsi_somatization], na.rm=T)
+  bsi$bsi_depression <- rowSums(bsi[, bsi_depression], na.rm=T)
+  bsi$bsi_anxiety <- rowSums(bsi[, bsi_anxiety], na.rm=T)
+  
+  bsi$bsi_gsi <- rowSums(bsi[, c('bsi_somatization', 'bsi_depression', 'bsi_anxiety')], na.rm=T)
+  
+  # #Cronbachs alpha 
+  # library(psych)
+  # drive_alpha <- alpha(bisbas[, bas_drive])
+  # drive_alpha <- drive_alpha$total$raw_alpha
+  # 
+  # fun_alpha <- alpha(bisbas[, bas_fun])
+  # fun_alpha <- fun_alpha$total$raw_alpha
+  # 
+  # reward_alpha <- alpha(bisbas[, bas_reward])
+  # reward_alpha <- reward_alpha$total$raw_alpha
+  # 
+  # bis_alpha <- alpha(bisbas[, bis])
+  # bis_alpha <- bis_alpha$total$raw_alpha
+  # 
+  if (timestamp) {
+    bsi = bsi[,c("record_id", "brief_symptom_inventory_18_timestamp",
+                 'bsi_somatization', 'bsi_depression', 'bsi_anxiety', 'bsi_gsi')]
+  } else if (!timestamp) {
+    bsi = bsi[,c("record_id",
+                 'bsi_somatization', 'bsi_depression', 'bsi_anxiety', 'bsi_gsi')]
+  }
+  # 
+  # cat('\nBIS/BAS Reference:
+  #     \nCarver, C. S., & White, T. L. (1994). Behavioral inhibition, 
+  #     behavioral activation, and affective responses to impending 
+  #     reward and punishment: The BIS/BAS scales. Journal of Personality 
+  #     and Social Psychology, 67, 319-333. \n')
+  # 
+  # cat('\nSubscales were scored (sums) using the following guide: \n',
+  #     'https://www.psy.miami.edu/faculty/ccarver/bisbas.html \n')
+  # 
+  # cat("\nCronbach's alpha for each subscale of BIS/BAS: ", '\n',
+  #     '• BAS Drive: ', round(drive_alpha, digits=3), '\n',
+  #     '• BAS Fun Seeking: ', round(fun_alpha, digits=3), '\n',
+  #     '• BAS Reward Responsiveness: ', round(reward_alpha, digits=3), '\n',
+  #     '• BIS (Behavioral Inhibition): ', round(bis_alpha, digits=3), '\n')
+  
+  
+  return(bsi)
+  
+}
+
+#' @title Pull all prenatal survey data
+#' @description This function will download and return the mean scores for all ORCA prenatal surveys (will print order of surveys)
+#' @param token Unique REDCap token ID
+#' @return A data frame for the completed surveys (order printed)
+#' @export
+get_orca_prenatal_surveys <- function(token) {
+  library(tidyverse)
+  
+  
+  orca_prenatal_consent <- get_orca_data(screener_token, form='orca_prenatal_consent') %>%
+    select(record_id)
+  demo <- get_orca_data(screener_token, form='prenatal_sociodemographic') %>%
+    select(-redcap_survey_identifier, -redcap_event_name, -prenatal_sociodemographic_complete)
+  pss <- get_orca_pss(screener_token,timepoint='prenatal_surveys_arm_1')
+  bisbas <- get_orca_bisbas(screener_token)
+  discrimination <- get_orca_discrimination(screener_token)
+  ss <- get_orca_social_support(screener_token, timepoint='prenatal_surveys_arm_1')
+  paid_leave <- get_orca_data(screener_token, form='paid_leave') %>%
+    select(-redcap_survey_identifier, -redcap_event_name, -paid_leave_complete)
+  bsi <- get_orca_bsi(screener_token)
+  cws <- get_orca_cws(screener_token)
+  prams <- get_orca_data(screener_token, form='prams')%>%
+    select(-redcap_survey_identifier, -redcap_event_name, -prams_complete)
+  
+  prenatal_surveys <- orca_prenatal_consent %>%
+    left_join(demo, by='record_id') %>%
+    left_join(pss, by='record_id') %>%
+    left_join(bisbas, by='record_id') %>%
+    left_join(discrimination, by='record_id') %>%
+    left_join(ss, by='record_id') %>%
+    left_join(paid_leave, by='record_id') %>%
+    left_join(bsi, by='record_id') %>%
+    left_join(cws, by='record_id') %>%
+    left_join(prams, by='record_id')
+  
+  cat("\nSurveys will be in following order: ", '\n',
+      '• Prenatal sociodemographic\n',
+      '• Perceived stress scale\n',
+      '• BISBAS\n',
+      '• Discrimination\n',
+      '• Social support\n',
+      '• Paid leave (unscored, raw fields)\n',
+      '• Brief symptom inventory 18\n',
+      '• Cambridge worry scale\n',
+      '• PRAMS (unscored, raw fields)\n')
+
+  return(prenatal_surveys)
+}
